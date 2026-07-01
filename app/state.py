@@ -1,6 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, TypedDict, Annotated
+from operator import add
 
 class Ticket(BaseModel):
     ticket_id: str #unique id for this ticket
@@ -10,3 +11,14 @@ class Ticket(BaseModel):
     customer_id: str | None=None
     created_at: datetime
     raw: dict = {} #holds the untouched original payload, in case we need it for audit
+
+class State(TypedDict):
+    ticket: Ticket
+    classification: dict  #agent 1's work
+    routing:dict #the model-router's choice
+    retrieval: dict #agent 2's KB snippets
+    draft: dict #agent 3's reply
+    compliance:dict #agent 4's pass/fail
+    decision: dict #auto send vs escalate
+    audit: Annotated[list,add]  #append only to make ticket longer
+    
