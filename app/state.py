@@ -5,7 +5,7 @@ from operator import add
 
 class Ticket(BaseModel):
     ticket_id: str #unique id for this ticket
-    source: Literal["form", "email", "voice_transcript"] #only these exact strings are allowed as input
+    source: Literal["chat","form", "email", "voice_transcript"] #only these exact strings are allowed as input
     subject: str #short title
     body: str #the normalised message text
     customer_id: str | None=None

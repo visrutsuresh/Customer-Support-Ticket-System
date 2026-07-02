@@ -50,8 +50,10 @@ def retrieve(state:State) -> dict:
 def generate(state:State) -> dict:
     t= state["ticket"]
     c = state["classification"]
+    hits = state["retrieval"]
+    kb_text = "\n\n".join(f"[{h['title']}]\n{h['content']}" for h in hits)
     prompt=f"""
-    You are a customer support agent representing Ascendion Support. Write a helpful, polite reply to this problem.
+    You are a customer support agent representing a company's support team. Write a helpful, polite reply to this problem.
     Classification: 
         Category: {c["category"]}
         Priority: {c["priority"]}
@@ -59,7 +61,11 @@ def generate(state:State) -> dict:
     Subject: {t.subject}
     Body: {t.body}
 
-    Do not use placeholders such as [YOUR NAME]. Use a generic greeting such as "Hello" or "Hi there!" and sign off as 'The Support Team'. Sound Enthusiastic.
+    Use ONLY the knowledge base articles below to answer. If they do not cover the question, say you will escalate to a specialist rather than inventing details. Mention which article you relied on by its title.
+
+    Knowledge base: {kb_text}
+
+    Do not use placeholders such as [YOUR NAME]. Use a generic greeting such as "Hello" or "Hi there!" and sign off as 'The Support Team'. Sound helpful and warm.
     """
 
     reply = router.generate(prompt)
