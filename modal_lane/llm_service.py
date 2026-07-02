@@ -1,4 +1,4 @@
-import modal
+import modal #type:ignore
 
 MODEL = "Qwen/Qwen2.5-3B-Instruct"
 
@@ -27,8 +27,8 @@ class LLM:
     def load(self):
         import os 
         os.environ["HF_HOME"] = "/cache"
-        import torch 
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        import torch #type:ignore
+        from transformers import AutoModelForCausalLM, AutoTokenizer #type:ignore
 
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
         self.model = AutoModelForCausalLM.from_pretrained(
