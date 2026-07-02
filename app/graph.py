@@ -37,8 +37,12 @@ def classify(state:State) -> dict:
     return {"classification": data, "audit":["classify done"]}
 
 def route(state:State) -> dict:
+    c = state["classification"]
+    sensitive = {"refund", "billing", "account"}
+    lane = "private" if c["category"] in sensitive else "cloud"
+    routing = {"lane": lane, "model": "qwen2.5-3b"}
     #print("route ran")
-    return {"audit":["route done"]}
+    return {"routing":routing, "audit":["route done"]}
 
 def retrieve(state:State) -> dict:
     t = state["ticket"]
@@ -134,6 +138,11 @@ def print_result(final: dict) -> None:
     print(f"  Category  : {c['category']}")
     print(f"  Priority  : {c['priority']}")
     print(f"  Sentiment : {c['sentiment']}")
+
+    r = final["routing"]
+    print("\nROUTING")
+    print(f"  Lane  : {r['lane']}")
+    print(f"  Model : {r['model']}")
 
     print("\nRETRIEVED ARTICLES")
     for h in final["retrieval"]:
