@@ -20,6 +20,7 @@ class State(TypedDict):
     draft: dict #agent 3's reply
     compliance:dict #agent 4's pass/fail
     decision: dict #auto send vs escalate
+    review_count: int #how many times the review gate has run (caps the regen retry)
     audit: Annotated[list,add]  #append only to make ticket longer
     raw_input: dict #the messy inbound payload, before intake turns it into a Ticket
     error: str | None #why the intake rejected this input

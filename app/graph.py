@@ -7,6 +7,13 @@ from app.kb import search
 import warnings
 warnings.filterwarnings("ignore")
 
+def _parse_json(raw: str) -> dict:
+    #small LLMs wrap JSON in markdown fences or add prose; grab the first {...} block and parse that
+    start, end = raw.find("{"), raw.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError(f"no JSON object in model output: {raw!r}")
+    return json.loads(raw[start:end+1])
+
 #building the worker functions
 def intake(state:State) -> dict:
     try:
@@ -31,7 +38,7 @@ def classify(state:State) -> dict:
     Body: {t.body}
     """
     raw = router.generate(prompt)
-    data=json.loads(raw)
+    data=_parse_json(raw)
     #print("RAW CLASSIFY:",raw)
     #print("classify ran")
     return {"classification": data, "audit":["classify done"]}
@@ -78,8 +85,32 @@ def generate(state:State) -> dict:
     return {"draft":{"reply":reply},"audit":["generate done"]}
 
 def review(state:State) -> dict:
+    draft = state["draft"]["reply"]
+    policy = open("policy.md").read()
+    prompt = f"""You are a compliance reviewer for customer support replies.
+    Judge the reply ONLY against the numbered policy rules below. Flag a rule ONLY if the reply
+    CLEARLY and OBVIOUSLY breaks it. When unsure, treat it as a pass. Do not invent violations.
+
+    Policy:
+    {policy}
+
+    Reply to check:
+    {draft}
+
+    Respond with ONLY a JSON object, no markdown and no other text:
+    {{"verdict": "pass" or "fail", "issues": ["a full sentence describing each clearly broken rule"]}}
+    If nothing is clearly broken, return exactly {{"verdict": "pass", "issues": []}}.
+    """
+    raw = router.generate(prompt)
+    data = _parse_json(raw)
+    count = state.get("review_count", 0) + 1
     #print("review ran")
-    return {"audit":["review done"]}
+    return {"compliance":data, "review_count":count, "audit":["review done"]}
+
+def after_review(state: State) -> str:
+    #on a clear compliance fail, loop back to generate ONCE (review_count caps it), else move on
+    failed = state["compliance"]["verdict"] == "fail"
+    return "generate" if failed and state["review_count"] < 2 else "decide"
 
 def decide(state:State) -> dict:
     err = state.get("error")
@@ -87,7 +118,10 @@ def decide(state:State) -> dict:
         decision = {"action": "escalate", "reason": "malformed intake"}
     else:
         c = state["classification"]
-        if c["priority"] in ["urgent", "high"]:
+        comp = state.get("compliance", {})
+        if comp.get("verdict") == "fail":
+            decision = {"action": "escalate", "reason": "failed compliance review"}
+        elif c["priority"] in ["urgent", "high"]:
             decision = {"action": "escalate", "reason": "high priority"}
         elif c["category"] in ["refund", "billing"]:
             decision = {"action": "escalate", "reason": "sensitive category"}
@@ -120,7 +154,11 @@ builder.add_edge("classify","route")
 builder.add_edge("route","retrieve")
 builder.add_edge("retrieve","generate")
 builder.add_edge("generate","review")
-builder.add_edge("review","decide")
+builder.add_conditional_edges(
+    "review",
+    after_review,
+    {"generate":"generate","decide":"decide"},
+)
 builder.add_edge("decide",END)
 
 #freeze the builder into a runnable graph
@@ -152,6 +190,13 @@ def print_result(final: dict) -> None:
     print("-"*60)
     print(final["draft"]["reply"].strip())
     print("="*60)
+
+    comp = final["compliance"]
+    print("\nCOMPLIANCE")
+    print(f"  Verdict : {comp['verdict']}")
+    if comp.get("issues"):
+        for issue in comp["issues"]:
+            print(f"  Issue   : {issue}")
 
     d = final["decision"]
     print("\nDECISION")
