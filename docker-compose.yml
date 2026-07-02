@@ -1,0 +1,22 @@
+# Local Weaviate (vector database) for the #1 Customer Support app.
+# Runs entirely on your machine via Docker. No cloud account, no API key.
+# Start:  docker compose up -d      Stop:  docker compose down
+services:
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.38.2
+    ports:
+      - "8080:8080"      # REST API (what we talk to from Python)
+      - "50051:50051"    # gRPC API (faster channel the client also uses)
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_API_BASED_MODULES: 'true'
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+volumes:
+  weaviate_data:

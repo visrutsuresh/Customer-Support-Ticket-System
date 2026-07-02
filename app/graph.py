@@ -3,6 +3,9 @@ from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
 import json
 from app import router
+from app.kb import search
+import warnings
+warnings.filterwarnings("ignore")
 
 #building the worker functions
 def intake(state:State) -> dict:
@@ -10,7 +13,7 @@ def intake(state:State) -> dict:
         ticket=normalize(state["raw_input"])
     except Exception as e:
         return {"error": str(e), "audit" : ["intake rejected: malformed"]}
-    print("intake ran")
+    #print("intake ran")
     return {"ticket": ticket, "error": None, "audit":["intake done"]}
 
 def after_intake(state: State) -> str:
@@ -30,16 +33,19 @@ def classify(state:State) -> dict:
     raw = router.generate(prompt)
     data=json.loads(raw)
     #print("RAW CLASSIFY:",raw)
-    print("classify ran")
+    #print("classify ran")
     return {"classification": data, "audit":["classify done"]}
 
 def route(state:State) -> dict:
-    print("route ran")
+    #print("route ran")
     return {"audit":["route done"]}
 
 def retrieve(state:State) -> dict:
-    print("retrieve ran")
-    return {"audit":["retrieve done"]}
+    t = state["ticket"]
+    hits = search(f"{t.subject} {t.body}")
+    #print("RETRIEVED:",[h["title"] for h in hits])
+    #print("retrieve ran")
+    return {"retrieval":hits, "audit":["retrieve done"]}
 
 def generate(state:State) -> dict:
     t= state["ticket"]
@@ -57,12 +63,12 @@ def generate(state:State) -> dict:
     """
 
     reply = router.generate(prompt)
-    print("DRAFT:",reply)
-    print("generate ran")
+    #print("DRAFT:",reply)
+    #print("generate ran")
     return {"draft":{"reply":reply},"audit":["generate done"]}
 
 def review(state:State) -> dict:
-    print("review ran")
+    #print("review ran")
     return {"audit":["review done"]}
 
 def decide(state:State) -> dict:
@@ -77,8 +83,8 @@ def decide(state:State) -> dict:
             decision = {"action": "escalate", "reason": "sensitive category"}
         else:
             decision = {"action": "auto_send"}
-    print("DECISION:", decision)
-    print("decide ran")
+    #print("DECISION:", decision)
+    #print("decide ran")
     return {"decision":decision,"audit":["decide done"]}
 
 #building the graph
@@ -110,6 +116,34 @@ builder.add_edge("decide",END)
 #freeze the builder into a runnable graph
 graph = builder.compile()
 
+def print_result(final: dict) -> None:
+    print("\n" + "="*60)
+    print("TICKET")
+    print("="*60)
+    print(f"  Subject : {final['ticket'].subject}")
+    print(f"  Body    : {final['ticket'].body}")
+
+    c = final["classification"]
+    print("\nCLASSIFICATION")
+    print(f"  Category  : {c['category']}")
+    print(f"  Priority  : {c['priority']}")
+    print(f"  Sentiment : {c['sentiment']}")
+
+    print("\nRETRIEVED ARTICLES")
+    for h in final["retrieval"]:
+        print(f"  - {h['title']}")
+
+    print("\nDRAFT REPLY")
+    print("-"*60)
+    print(final["draft"]["reply"].strip())
+    print("="*60)
+
+    d = final["decision"]
+    print("\nDECISION")
+    print(f"  Action : {d['action']}")
+    if d.get("reason"):
+        print(f"  Reason : {d['reason']}")
+
 if __name__=="__main__":
     initial_state = {
         "raw_input": {"source": "email", "subject": "Cannot log in", "body": "reset link is broken"},
@@ -117,7 +151,10 @@ if __name__=="__main__":
     }
 
     final_state=graph.invoke(initial_state)
-    print("classification:", final_state["classification"])
-    print("ticket:",final_state["ticket"])
-    print("---")
+
+    print_result(final_state)
+
+    #print("classification:", final_state["classification"])
+    #print("ticket:",final_state["ticket"])
+    #print("---")
     print("audit log:",final_state["audit"])
