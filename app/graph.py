@@ -42,8 +42,24 @@ def retrieve(state:State) -> dict:
     return {"audit":["retrieve done"]}
 
 def generate(state:State) -> dict:
+    t= state["ticket"]
+    c = state["classification"]
+    prompt=f"""
+    You are a customer support agent representing Ascendion Support. Write a helpful, polite reply to this problem.
+    Classification: 
+        Category: {c["category"]}
+        Priority: {c["priority"]}
+        Sentiment:{c["sentiment"]}
+    Subject: {t.subject}
+    Body: {t.body}
+
+    Do not use placeholders such as [YOUR NAME]. Use a generic greeting such as "Hello" or "Hi there!" and sign off as 'The Support Team'. Sound Enthusiastic.
+    """
+
+    reply = router.generate(prompt)
+    print("DRAFT:",reply)
     print("generate ran")
-    return {"audit":["generate done"]}
+    return {"draft":{"reply":reply},"audit":["generate done"]}
 
 def review(state:State) -> dict:
     print("review ran")
