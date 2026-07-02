@@ -1,7 +1,8 @@
-from app.state import State,Ticket
-from datetime import datetime
+from app.state import State
 from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
+import json
+from app import router
 
 #building the worker functions
 def intake(state:State) -> dict:
@@ -16,8 +17,21 @@ def after_intake(state: State) -> str:
     return "decide" if state.get("error") else "classify"
 
 def classify(state:State) -> dict:
+    t = state["ticket"]
+    prompt=f"""Classify this support ticket.
+    category: one of [billing,technical,account,general,shipping,refund,feature_request,complaint]
+    priority: one of [low,medium,high,urgent]
+    sentiment: one of [positive, neutral, negative]
+    Respond with ONLY a JSON object with keys category, priority, sentiment. No other text.
+    
+    Subject: {t.subject}
+    Body: {t.body}
+    """
+    raw = router.generate(prompt)
+    data=json.loads(raw)
+    #print("RAW CLASSIFY:",raw)
     print("classify ran")
-    return {"audit":["classify done"]}
+    return {"classification": data, "audit":["classify done"]}
 
 def route(state:State) -> dict:
     print("route ran")
@@ -69,19 +83,13 @@ builder.add_edge("decide",END)
 graph = builder.compile()
 
 if __name__=="__main__":
-    ticket = Ticket(
-        ticket_id="T-001",
-        source="email",
-        subject="Cannot log in",
-        body="I forgot my password and the reset link is broken.",
-        created_at=datetime.now(),
-    )
     initial_state = {
         "raw_input": {"source": "email", "subject": "Cannot log in", "body": "reset link is broken"},
         "audit": [],
     }
 
     final_state=graph.invoke(initial_state)
+    print("classification:", final_state["classification"])
     print("ticket:",final_state["ticket"])
     print("---")
     print("audit log:",final_state["audit"])
