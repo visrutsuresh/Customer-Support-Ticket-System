@@ -66,8 +66,20 @@ def review(state:State) -> dict:
     return {"audit":["review done"]}
 
 def decide(state:State) -> dict:
+    err = state.get("error")
+    if err:
+        decision = {"action": "escalate", "reason": "malformed intake"}
+    else:
+        c = state["classification"]
+        if c["priority"] in ["urgent", "high"]:
+            decision = {"action": "escalate", "reason": "high priority"}
+        elif c["category"] in ["refund", "billing"]:
+            decision = {"action": "escalate", "reason": "sensitive category"}
+        else:
+            decision = {"action": "auto_send"}
+    print("DECISION:", decision)
     print("decide ran")
-    return {"audit":["decide done"]}
+    return {"decision":decision,"audit":["decide done"]}
 
 #building the graph
 builder = StateGraph(State)
