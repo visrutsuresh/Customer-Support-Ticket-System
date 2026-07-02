@@ -1,11 +1,13 @@
 from app.state import State,Ticket
 from datetime import datetime
 from langgraph.graph import StateGraph, START, END
+from app.intake import normalize
 
 #building the worker functions
 def intake(state:State) -> dict:
+    ticket=normalize(state["raw_input"])
     print("intake ran")
-    return {"audit":["intake done"]}
+    return {"ticket": ticket, "audit":["intake done"]}
 
 def classify(state:State) -> dict:
     print("classify ran")
@@ -64,9 +66,12 @@ if __name__=="__main__":
         body="I forgot my password and the reset link is broken.",
         created_at=datetime.now(),
     )
-    initial_state={"ticket": ticket, "audit": []}
+    initial_state = {
+        "raw_input": {"source": "email", "subject": "Cannot log in", "body": "reset link is broken"},
+        "audit": [],
+    }
 
     final_state=graph.invoke(initial_state)
-
+    print("ticket:",final_state["ticket"])
     print("---")
     print("audit log:",final_state["audit"])

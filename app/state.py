@@ -21,4 +21,4 @@ class State(TypedDict):
     compliance:dict #agent 4's pass/fail
     decision: dict #auto send vs escalate
     audit: Annotated[list,add]  #append only to make ticket longer
-    
+    raw_input: dict #the messy inbound payload, before intake turns it into a Ticket
