@@ -22,3 +22,5 @@ class State(TypedDict):
     decision: dict #auto send vs escalate
     audit: Annotated[list,add]  #append only to make ticket longer
     raw_input: dict #the messy inbound payload, before intake turns it into a Ticket
+    error: str | None #why the intake rejected this input
+    

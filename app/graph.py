@@ -5,9 +5,15 @@ from app.intake import normalize
 
 #building the worker functions
 def intake(state:State) -> dict:
-    ticket=normalize(state["raw_input"])
+    try:
+        ticket=normalize(state["raw_input"])
+    except Exception as e:
+        return {"error": str(e), "audit" : ["intake rejected: malformed"]}
     print("intake ran")
-    return {"ticket": ticket, "audit":["intake done"]}
+    return {"ticket": ticket, "error": None, "audit":["intake done"]}
+
+def after_intake(state: State) -> str:
+    return "decide" if state.get("error") else "classify"
 
 def classify(state:State) -> dict:
     print("classify ran")
@@ -47,7 +53,11 @@ builder.add_node("decide",decide)
 
 #drawing the arrws: Start -> intake ->.... -> decide -> END
 builder.add_edge(START,"intake")
-builder.add_edge("intake","classify")
+builder.add_conditional_edges(
+    "intake",
+    after_intake,
+    {"classify": "classify","decide":"decide" },
+)
 builder.add_edge("classify","route")
 builder.add_edge("route","retrieve")
 builder.add_edge("retrieve","generate")
