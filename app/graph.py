@@ -28,17 +28,42 @@ def after_intake(state: State) -> str:
 
 def classify(state:State) -> dict:
     t = state["ticket"]
-    prompt=f"""Classify this support ticket.
+    prompt=f"""Classify this support ticket. Choose the best label in each group using the definitions.
+
     category: one of [billing,technical,account,general,shipping,refund,feature_request,complaint]
-    priority: one of [low,medium,high,urgent]
-    sentiment: one of [positive, neutral, negative]
-    Respond with ONLY a JSON object with keys category, priority, sentiment. No other text.
+      billing = charges, invoices, payment methods, pricing disputes
+      technical = product not working, errors, bugs, broken links, cannot access or log in
+      account = managing account details: profile, settings, changing email or password
+      shipping = delivery, tracking, lost or delayed packages
+      refund = wants money returned or to cancel for a refund
+      feature_request = asking for something the product does not do yet
+      complaint = venting dissatisfaction with no specific fixable request
+      general = anything that fits none of the above
+
+    priority: one of [Critical,High,Medium,Low]
+      Critical = service down, a security or data breach, a legal threat, or a vulnerable customer at risk
+      High = money is at stake, the customer is angry, or there is a hard deadline
+      Medium = a normal problem that needs help but is not urgent
+      Low = a simple how-to, self-serve, or informational question
+
+    business_impact: one of [low,medium,high]
+      high = risks losing the customer, a large sum of money, many users affected, or legal/reputational exposure
+      medium = meaningfully affects one customer's experience but is recoverable
+      low = minor inconvenience, easily resolved, little consequence if it waits
+
+    sentiment: one of [positive,neutral,negative]
+      positive = happy, grateful, complimentary
+      neutral = matter-of-fact, no strong emotion
+      negative = frustrated, angry, disappointed
+
+    Respond with ONLY a JSON object with keys category, priority, business_impact, sentiment. No other text.
     
     Subject: {t.subject}
     Body: {t.body}
     """
     raw = router.generate(prompt)
     data=_parse_json(raw)
+    data = {k: (v.lower() if isinstance(v, str) else v) for k, v in data.items()}
     #print("RAW CLASSIFY:",raw)
     #print("classify ran")
     return {"classification": data, "audit":["classify done"]}
@@ -121,8 +146,10 @@ def decide(state:State) -> dict:
         comp = state.get("compliance", {})
         if comp.get("verdict") == "fail":
             decision = {"action": "escalate", "reason": "failed compliance review"}
-        elif c["priority"] in ["urgent", "high"]:
+        elif c["priority"] in ["critical", "high"]:
             decision = {"action": "escalate", "reason": "high priority"}
+        elif c.get("business_impact") == "high":
+            decision={"action":"escalate","reason":"high business impact"}
         elif c["category"] in ["refund", "billing"]:
             decision = {"action": "escalate", "reason": "sensitive category"}
         else:
@@ -173,9 +200,10 @@ def print_result(final: dict) -> None:
 
     c = final["classification"]
     print("\nCLASSIFICATION")
-    print(f"  Category  : {c['category']}")
-    print(f"  Priority  : {c['priority']}")
-    print(f"  Sentiment : {c['sentiment']}")
+    print(f"  Category  : {c['category'].title()}")
+    print(f"  Priority  : {c['priority'].title()}")
+    print(f"  Business impact : {c['business_impact'].title()}")
+    print(f"  Sentiment : {c['sentiment'].title()}")
 
     r = final["routing"]
     print("\nROUTING")
