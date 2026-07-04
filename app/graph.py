@@ -102,7 +102,11 @@ def generate(state:State) -> dict:
 
     Use ONLY the knowledge base articles below to answer. If they do not cover the question, say you will escalate to a specialist rather than inventing details. Mention which article you relied on by its title.
 
+    If the ticket is missing a specific detail you would need to actually resolve it (for example a refund with no order number, or a vague problem with no specifics), do NOT invent a full solution. Instead reply with a short, polite message asking the customer for the exact missing detail, and nothing else.
+
     Knowledge base: {kb_text}
+
+    Begin your response with a single control line: "KIND: answer" if you are answering the question, or "KIND: question" if you are instead asking the customer for missing information. Put the actual reply on the lines after that control line.
 
     Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Support Team'. Sound helpful and warm.
     """
@@ -110,7 +114,15 @@ def generate(state:State) -> dict:
     reply = router.generate(prompt)
     #print("DRAFT:",reply)
     #print("generate ran")
-    return {"draft":{"reply":reply},"audit":["generate done"]}
+    lines = reply.strip().split("\n",1)
+    if lines[0].strip().lower().startswith("kind:"):
+        kind = lines[0].split(":",1)[1].strip().lower()
+        reply=lines[1].strip() if len(lines) > 1 else ""
+    else:
+        kind="answer"
+        
+
+    return {"draft":{"reply":reply,"kind":kind},"audit":["generate done"]}
 
 def review(state:State) -> dict:
     draft = state["draft"]["reply"]
@@ -149,6 +161,8 @@ def decide(state:State) -> dict:
         comp = state.get("compliance", {})
         if comp.get("verdict") == "fail":
             decision = {"action": "escalate", "reason": "failed compliance review"}
+        elif state["draft"].get("kind") == "question":
+            decision = {"action": "auto_send", "reason":"requesting more information"}
         elif c["priority"] in ["critical", "high"]:
             decision = {"action": "escalate", "reason": "high priority"}
         elif c.get("business_impact") == "high":
