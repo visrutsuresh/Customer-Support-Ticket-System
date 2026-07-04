@@ -17,6 +17,8 @@ def normalize(raw: dict) -> Ticket:
         subject=subject,
         body=body,
         customer_id=raw.get("customer_id"),
+        customer_name=raw.get("name") or raw.get("customer_name"),
+        customer_email=raw.get("email"),
         created_at=datetime.now(),
         raw=raw,
     )

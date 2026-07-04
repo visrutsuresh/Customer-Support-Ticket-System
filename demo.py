@@ -1,10 +1,10 @@
 from app.graph import graph, print_result
 
 tickets = [
-    {"source": "email", "subject": "Cannot log in", "body": "my password reset link is broken"},
-    {"source": "email", "subject": "Refund request", "body": "I want my money back for an unused subscription"},
-    {"source": "chat",  "subject": "Still no refund!!", "body": "This is unacceptable, I have waited two weeks and I am furious"},
-    {"source": "email", "subject": "Where is my order", "body": "tracking has not updated in three days"},
+    {"source": "email", "name": "Alice Tan",   "email": "alice@example.com", "subject": "Cannot log in", "body": "my password reset link is broken"},
+    {"source": "email", "name": "Bob Rivera",  "email": "bob@example.com",   "subject": "Refund request", "body": "I want my money back for an unused subscription"},
+    {"source": "chat",  "name": "Chen Wei",    "email": "chen@example.com",  "subject": "Still no refund!!", "body": "This is unacceptable, I have waited two weeks and I am furious"},
+    {"source": "email", "name": "Dana Okoro",  "email": "dana@example.com",  "subject": "Where is my order", "body": "tracking has not updated in three days"},
 ]
 
 for i,raw in enumerate(tickets, start =1):

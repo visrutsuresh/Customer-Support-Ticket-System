@@ -9,6 +9,8 @@ class Ticket(BaseModel):
     subject: str #short title
     body: str #the normalised message text
     customer_id: str | None=None
+    customer_name: str | None=None
+    customer_email: str | None=None
     created_at: datetime
     raw: dict = {} #holds the untouched original payload, in case we need it for audit
 

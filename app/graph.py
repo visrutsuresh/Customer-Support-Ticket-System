@@ -88,6 +88,9 @@ def generate(state:State) -> dict:
     c = state["classification"]
     hits = state["retrieval"]
     kb_text = "\n\n".join(f"[{h['title']}]\n{h['content']}" for h in hits)
+
+    greeting = f"Hi {t.customer_name.split()[0]}," if t.customer_name else "Hi there!"
+
     prompt=f"""
     You are a customer support agent representing a company's support team. Write a helpful, polite reply to this problem.
     Classification: 
@@ -101,7 +104,7 @@ def generate(state:State) -> dict:
 
     Knowledge base: {kb_text}
 
-    Do not use placeholders such as [YOUR NAME]. Use a generic greeting such as "Hello" or "Hi there!" and sign off as 'The Support Team'. Sound helpful and warm.
+    Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Support Team'. Sound helpful and warm.
     """
 
     reply = router.generate(prompt)
