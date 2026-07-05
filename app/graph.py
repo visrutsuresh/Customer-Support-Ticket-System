@@ -2,6 +2,8 @@ from app.state import State
 from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
 import json
+import re
+import os
 from app import router
 from app.kb import search
 import warnings
@@ -126,26 +128,42 @@ def generate(state:State) -> dict:
 
 def review(state:State) -> dict:
     draft = state["draft"]["reply"]
-    policy = open("policy.md").read()
-    prompt = f"""You are a compliance reviewer for customer support replies.
-    Judge the reply ONLY against the numbered policy rules below. Flag a rule ONLY if the reply
-    CLEARLY and OBVIOUSLY breaks it. When unsure, treat it as a pass. Do not invent violations.
+    
+    issues = []
+    
+    # deterministic checks (free, always correct)
+    if re.search(r"\[[A-Za-z0-9 _/]+\]", draft):
+        issues.append("contains an unfilled placeholder in square brackets")
+    if "The Support Team" not in draft:
+        issues.append("missing the 'The Support Team' sign-off")
 
-    Policy:
-    {policy}
+    if os.getenv("REVIEW_LLM","on").lower() == "on":
+        # full-policy judgement on the stronger 14B review lane
+        policy = open("policy.md").read()
+        prompt = f"""You are a compliance reviewer for a customer support reply.
+        Check the reply against the numbered policy rules below. FAIL only if the reply text clearly
+        breaks a rule. Asking the customer for their email, order number, or more information is
+        allowed and PASSES. When unsure, PASS.
 
-    Reply to check:
-    {draft}
+        Policy:
+        {policy}
 
-    Respond with ONLY a JSON object, no markdown and no other text:
-    {{"verdict": "pass" or "fail", "issues": ["a full sentence describing each clearly broken rule"]}}
-    If nothing is clearly broken, return exactly {{"verdict": "pass", "issues": []}}.
-    """
-    raw = router.generate(prompt)
-    data = _parse_json(raw)
+        Reply to check:
+        {draft}
+
+        Respond in EXACTLY this format and nothing else:
+        PASS
+        or
+        FAIL: <one short reason>
+        """
+        raw = router.generate_review(prompt).strip()
+        if raw.upper().startswith("FAIL"):
+            reason = raw.split(":", 1)[1].strip() if ":" in raw else "policy violation"
+            issues.append(reason)
+
+    verdict = "fail" if issues else "pass"
     count = state.get("review_count", 0) + 1
-    #print("review ran")
-    return {"compliance":data, "review_count":count, "audit":["review done"]}
+    return {"compliance": {"verdict": verdict, "issues": issues}, "review_count": count, "audit": ["review done"]}
 
 def after_review(state: State) -> str:
     #on a clear compliance fail, loop back to generate ONCE (review_count caps it), else move on
@@ -161,14 +179,14 @@ def decide(state:State) -> dict:
         comp = state.get("compliance", {})
         if comp.get("verdict") == "fail":
             decision = {"action": "escalate", "reason": "failed compliance review"}
-        elif state["draft"].get("kind") == "question":
-            decision = {"action": "auto_send", "reason":"requesting more information"}
         elif c["priority"] in ["critical", "high"]:
             decision = {"action": "escalate", "reason": "high priority"}
         elif c.get("business_impact") == "high":
             decision={"action":"escalate","reason":"high business impact"}
         elif c["category"] in ["refund", "billing"]:
             decision = {"action": "escalate", "reason": "sensitive category"}
+        elif state["draft"].get("kind") == "question":
+            decision = {"action": "auto_send", "reason":"requesting more information"}
         else:
             decision = {"action": "auto_send"}
     #print("DECISION:", decision)
@@ -229,7 +247,7 @@ def print_result(final: dict) -> None:
 
     print("\nRETRIEVED ARTICLES")
     for h in final["retrieval"]:
-        print(f"  - {h['title']}")
+        print(f"  - {h['title']} ({h['score']}% relevant)")
 
     print("\nDRAFT REPLY")
     print("-"*60)
