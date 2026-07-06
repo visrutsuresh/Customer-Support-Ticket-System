@@ -3,7 +3,6 @@ from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
 import json
 import re
-import os
 from app import router
 from app.kb import search, index_resolved
 import warnings
@@ -64,12 +63,29 @@ def classify(state:State) -> dict:
     Subject: {t.subject}
     Body: {t.body}
     """
-    raw = router.generate(prompt)
+    raw = router.think(prompt)
     data=_parse_json(raw)
     data = {k: (v.lower() if isinstance(v, str) else v) for k, v in data.items()}
     #print("RAW CLASSIFY:",raw)
     #print("classify ran")
     return {"classification": data, "audit":["classify done"]}
+
+def score_difficulty(state: State) -> dict:
+    t = state["ticket"]
+    prompt = f"""Rate how hard this support ticket is to resolve well.
+
+    simple = a routine, self-serve request a knowledge-base article can answer directly in one step (for example: how to reset a password, store hours, order tracking status).
+    complex = needs judgement, multiple steps, investigation, or careful handling (for example: an angry weeks-old refund dispute, account recovery, a vague "nothing works" with no details, anything with money or a frustrated customer at stake).
+
+    Respond with ONLY a JSON object with keys level and reason. level is exactly "simple" or "complex". reason is one short phrase. No other text.
+
+    Subject: {t.subject}
+    Body: {t.body}
+    """
+    raw = router.think(prompt)
+    data = _parse_json(raw)
+    data["level"] = data.get("level", "simple").lower()
+    return {"difficulty": data, "audit": ["score_difficulty done"]}
 
 def detect_sensitivity(state: State) -> dict:
     t = state["ticket"]
@@ -90,7 +106,9 @@ def detect_sensitivity(state: State) -> dict:
 def route(state:State) -> dict:
     s = state["sensitivity"]
     lane = "private" if s["is_sensitive"] else "cloud"
-    routing = {"lane": lane, "model": "qwen2.5-3b"}
+    level = state["difficulty"]["level"]
+    model = router.intended_model(lane,level)
+    routing = {"lane": lane, "tier": level, "model": model}
     #print("route ran")
     return {"routing":routing, "audit":["route done"]}
 
@@ -129,7 +147,8 @@ def generate(state:State) -> dict:
     Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Support Team'. Sound helpful and warm.
     """
 
-    reply = router.generate(prompt)
+    r = state["routing"]
+    reply = router.generate_reply(prompt, r['lane'], r['tier'])
     #print("DRAFT:",reply)
     #print("generate ran")
     lines = reply.strip().split("\n",1)
@@ -153,29 +172,28 @@ def review(state:State) -> dict:
     if "The Support Team" not in draft:
         issues.append("missing the 'The Support Team' sign-off")
 
-    if os.getenv("REVIEW_LLM","on").lower() == "on":
-        # full-policy judgement on the stronger 14B review lane
-        policy = open("policy.md").read()
-        prompt = f"""You are a compliance reviewer for a customer support reply.
-        Check the reply against the numbered policy rules below. FAIL only if the reply text clearly
-        breaks a rule. Asking the customer for their email, order number, or more information is
-        allowed and PASSES. When unsure, PASS.
+    # full-policy judgement on the check model (14B in local/full, 3B in dev)
+    policy = open("policy.md").read()
+    prompt = f"""You are a compliance reviewer for a customer support reply.
+    Check the reply against the numbered policy rules below. FAIL only if the reply text clearly
+    breaks a rule. Asking the customer for their email, order number, or more information is
+    allowed and PASSES. When unsure, PASS.
 
-        Policy:
-        {policy}
+    Policy:
+    {policy}
 
-        Reply to check:
-        {draft}
+    Reply to check:
+    {draft}
 
-        Respond in EXACTLY this format and nothing else:
-        PASS
-        or
-        FAIL: <one short reason>
-        """
-        raw = router.generate_review(prompt).strip()
-        if raw.upper().startswith("FAIL"):
-            reason = raw.split(":", 1)[1].strip() if ":" in raw else "policy violation"
-            issues.append(reason)
+    Respond in EXACTLY this format and nothing else:
+    PASS
+    or
+    FAIL: <one short reason>
+    """
+    raw = router.think(prompt).strip()
+    if raw.upper().startswith("FAIL"):
+        reason = raw.split(":", 1)[1].strip() if ":" in raw else "policy violation"
+        issues.append(reason)
 
     verdict = "fail" if issues else "pass"
     count = state.get("review_count", 0) + 1
@@ -225,6 +243,7 @@ builder = StateGraph(State)
 #register each worker under a name
 builder.add_node("intake",intake)
 builder.add_node("classify",classify)
+builder.add_node("score_difficulty", score_difficulty)
 builder.add_node("detect_sensitivity",detect_sensitivity)
 builder.add_node("route",route)
 builder.add_node("retrieve",retrieve)
@@ -241,7 +260,8 @@ builder.add_conditional_edges(
     {"classify": "classify","decide":"decide" },
 )
 builder.add_edge("classify","detect_sensitivity")
-builder.add_edge("detect_sensitivity","route")
+builder.add_edge("detect_sensitivity","score_difficulty")
+builder.add_edge("score_difficulty","route")
 builder.add_edge("route","retrieve")
 builder.add_edge("retrieve","generate")
 builder.add_edge("generate","review")

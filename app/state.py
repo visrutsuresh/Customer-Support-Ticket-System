@@ -28,3 +28,4 @@ class State(TypedDict):
     error: str | None #why the intake rejected this input
     learned: bool #True if this resolved ticket was filed into the KB 
     sensitivity: dict #PII scan + category heuristic result, set before routing
+    difficulty: dict #LLM difficulty score (simple vs complex)

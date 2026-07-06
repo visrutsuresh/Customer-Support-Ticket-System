@@ -7,24 +7,73 @@ load_dotenv()
 LANE_URL = os.environ["PRIVATE_LANE_URL"]
 LANE_TOKEN = os.environ["PRIVATE_LANE_TOKEN"]
 REVIEW_URL = os.environ["REVIEW_LANE_URL"]
+MODEL_TIER = os.getenv("MODEL_TIER", "dev").lower()
 
-def generate(prompt: str, max_new_tokens: int = 512) -> str:
-    # send a prompt to the private LLM lane and return the generated text
+# Claude model ids for the cloud lane
+HAIKU = "claude-3-5-haiku-latest"
+SONNET = "claude-sonnet-4-5"
+
+def _modal(url:str, prompt: str, max_new_tokens: int) -> str:
     resp = requests.post(
-        LANE_URL,
-        json={"prompt": prompt, "token": LANE_TOKEN, "max_new_tokens": max_new_tokens},
-        timeout=120,
+        url,
+        json = {"prompt":prompt, "token":LANE_TOKEN, "max_new_tokens": max_new_tokens},
+        timeout = 180,
     )
     resp.raise_for_status()
     return resp.json()["text"]
 
-def generate_review(prompt: str, max_new_tokens:int =256) -> str :
-    #send a prompt to the 14B review lane and return the generated text
-    resp = requests.post(
-        REVIEW_URL,
-        json = {"prompt": prompt,"token": LANE_TOKEN, "max_new_tokens": max_new_tokens},
-        timeout=180,
+def _claude(model: str, prompt: str, max_new_tokens: int) ->str:
+    from anthropic import Anthropic
+    client = Anthropic() #reads ANTHROPIC_API_KEY from the environment
+    msg = client.messages.create(
+        model=model,
+        max_tokens= max_new_tokens,
+        messages = [{"role": "user", "content": prompt }],
     )
-    resp.raise_for_status()
-    return resp.json()["text"]
+    return msg.content[0].text
+
+# dispatch: model_id -> the right backend
+def call_model (model_id: str, prompt: str, max_new_tokens: int=512) -> str:
+    if model_id=="3b":
+        return _modal(LANE_URL, prompt, max_new_tokens)
+    elif model_id == "14b":
+        return _modal(REVIEW_URL,prompt,max_new_tokens)
+    elif model_id == "haiku":
+        return _claude(HAIKU, prompt, max_new_tokens)
+    elif model_id == "sonnet":
+        return _claude(SONNET, prompt, max_new_tokens)
+    
+    raise ValueError(f"unknown model_id: {model_id}")
+
+# resolvers: the toggle decides which model_id to use 
+def check_model () -> str:
+    #reasoning checks (classify, difficulty, sensitivity, review): 14B when paying for quality, else 3B
+    return "3b" if MODEL_TIER == "dev" else "14b"
+
+def intended_model(lane: str, level: str) -> str:
+    #the ideal full- 2x2 pick, ALWAYS returned for display, regardless of the toggle
+    grid = {
+        ("private", "simple"): "3b",
+        ("private", "complex"): "14b",
+        ("cloud", "simple"): "haiku",
+        ("cloud", "complex"): "sonnet",
+    }
+    return grid[(lane, level)]
+
+def reply_model(lane: str, level:str) -> str:
+    #what ACTUALLY runs for the customer reply, capped by the toggle
+    if MODEL_TIER == "dev":
+        return '3b'
+    elif MODEL_TIER == "local":
+        return "14b" if level == "complex" else "3b"
+    return intended_model(lane,level) #full
+
+def think(prompt: str, max_new_tokens: int=256) -> str:
+    #every internal reasoning check goes through here
+    return call_model(check_model(),prompt,max_new_tokens)
+
+def generate_reply(prompt:str, lane: str, level: str, max_new_tokens: int = 512) -> str:
+    # the customer facing reply, model chosen by the 2x2 matrix +toggle
+    return call_model(reply_model(lane,level),prompt,max_new_tokens)
+
     
