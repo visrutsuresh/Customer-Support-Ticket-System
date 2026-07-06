@@ -7,6 +7,7 @@ import os
 from app import router
 from app.kb import search, index_resolved
 import warnings
+from app.pii import scan
 warnings.filterwarnings("ignore")
 
 def _parse_json(raw: str) -> dict:
@@ -70,10 +71,25 @@ def classify(state:State) -> dict:
     #print("classify ran")
     return {"classification": data, "audit":["classify done"]}
 
-def route(state:State) -> dict:
+def detect_sensitivity(state: State) -> dict:
+    t = state["ticket"]
     c = state["classification"]
-    sensitive = {"refund", "billing", "account"}
-    lane = "private" if c["category"] in sensitive else "cloud"
+    pii = scan(f"{t.subject} {t.body}")
+    category_hit = c["category"] in {"refund", "billing", "account"}
+    is_sensitive = bool(pii) or category_hit
+
+    reasons =[]
+    if pii:
+        reasons.append("PII found:" + ", ".join(pii))
+    if category_hit:
+        reasons.append(f"sensitive category: {c['category']}")
+
+    sensitivity = {"is_sensitive": is_sensitive, "pii_types": pii, "reason": "; ".join(reasons) or "none"}
+    return {"sensitivity": sensitivity,"audit": ["detect_sensitivity done"]}
+
+def route(state:State) -> dict:
+    s = state["sensitivity"]
+    lane = "private" if s["is_sensitive"] else "cloud"
     routing = {"lane": lane, "model": "qwen2.5-3b"}
     #print("route ran")
     return {"routing":routing, "audit":["route done"]}
@@ -209,6 +225,7 @@ builder = StateGraph(State)
 #register each worker under a name
 builder.add_node("intake",intake)
 builder.add_node("classify",classify)
+builder.add_node("detect_sensitivity",detect_sensitivity)
 builder.add_node("route",route)
 builder.add_node("retrieve",retrieve)
 builder.add_node("generate",generate)
@@ -223,7 +240,8 @@ builder.add_conditional_edges(
     after_intake,
     {"classify": "classify","decide":"decide" },
 )
-builder.add_edge("classify","route")
+builder.add_edge("classify","detect_sensitivity")
+builder.add_edge("detect_sensitivity","route")
 builder.add_edge("route","retrieve")
 builder.add_edge("retrieve","generate")
 builder.add_edge("generate","review")
@@ -251,6 +269,12 @@ def print_result(final: dict) -> None:
     print(f"  Priority  : {c['priority'].title()}")
     print(f"  Business impact : {c['business_impact'].title()}")
     print(f"  Sentiment : {c['sentiment'].title()}")
+
+    s = final["sensitivity"]
+    print("\nSENSITIVITY")
+    print(f" Sensitive: {s['is_sensitive']}")
+    print(f" PII types: {','.join(s['pii_types']) or 'none'}")
+    print(f" Reason   : {s['reason']}")
 
     r = final["routing"]
     print("\nROUTING")
