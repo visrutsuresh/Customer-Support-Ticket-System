@@ -6,6 +6,7 @@ tickets = [
     {"source": "chat",  "name": "Chen Wei",    "email": "chen@example.com",  "subject": "Still no refund!!", "body": "This is unacceptable, I have waited two weeks and I am furious"},
     {"source": "email", "name": "Dana Okoro",  "email": "dana@example.com",  "subject": "Where is my order", "body": "tracking has not updated in three days"},
     {"source": "chat", "name": "Evan Lee", "email": "evan@example.com", "subject": "It stopped working", "body": "nothing works please help"},
+    {"source": "form", "name": "Fiona Adams", "email": "[REDACTED_EMAIL_ADDRESS_8]","subject": "How do I reset my password", "body": "I forgot my password and want to reset it. What are the steps?"},
 ]
 
 for i,raw in enumerate(tickets, start =1):

@@ -22,3 +22,15 @@ def search(text: str, k:int=3) -> list[dict]:
 
     finally:
         client.close()
+
+def index_resolved(title: str, content: str) -> None:
+    client = weaviate.connect_to_local()
+    try:
+        kb = client.collections.get("knowledge")
+        kb.data.insert(
+            properties = {"title": title, "content": content, "source": "ticket"},
+            vector = embed(title + ". " + content ),
+        )
+
+    finally:
+        client.close()

@@ -5,7 +5,7 @@ import json
 import re
 import os
 from app import router
-from app.kb import search
+from app.kb import search, index_resolved
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -193,6 +193,16 @@ def decide(state:State) -> dict:
     #print("decide ran")
     return {"decision":decision,"audit":["decide done"]}
 
+def learn(state: State) -> dict:
+    d = state["decision"]
+    draft = state.get("draft", {})
+    if d.get("action") == "auto_send" and draft.get("kind") == "answer":
+        t = state["ticket"]
+        content = f"Problem: {t.body} Resolution: {draft["reply"]}"
+        index_resolved(t.subject,content)
+        return {"learned": True, "audit": ["learn:index resolved ticket"]}
+    return {"learned": False, "audit": ["learn: skipped, not a clean auto-answer"]}
+
 #building the graph
 builder = StateGraph(State)
 
@@ -204,6 +214,7 @@ builder.add_node("retrieve",retrieve)
 builder.add_node("generate",generate)
 builder.add_node("review",review)
 builder.add_node("decide",decide)
+builder.add_node("learn",learn)
 
 #drawing the arrws: Start -> intake ->.... -> decide -> END
 builder.add_edge(START,"intake")
@@ -221,7 +232,8 @@ builder.add_conditional_edges(
     after_review,
     {"generate":"generate","decide":"decide"},
 )
-builder.add_edge("decide",END)
+builder.add_edge("decide","learn")
+builder.add_edge("learn",END)
 
 #freeze the builder into a runnable graph
 graph = builder.compile()
@@ -266,6 +278,9 @@ def print_result(final: dict) -> None:
     print(f"  Action : {d['action']}")
     if d.get("reason"):
         print(f"  Reason : {d['reason']}")
+    
+    print("\nLEARNING")
+    print(f"  Filed back into KB : {final.get('learned', False)}")
 
 if __name__=="__main__":
     initial_state = {
