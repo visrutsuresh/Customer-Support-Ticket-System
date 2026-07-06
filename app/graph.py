@@ -247,7 +247,7 @@ def print_result(final: dict) -> None:
 
     print("\nRETRIEVED ARTICLES")
     for h in final["retrieval"]:
-        print(f"  - {h['title']} ({h['score']}% relevant)")
+        print(f"  - {h['source']} {h['title']} ({h['score']}% relevant)")
 
     print("\nDRAFT REPLY")
     print("-"*60)
