@@ -7,6 +7,7 @@ from app import router
 from app.kb import search, index_resolved
 import warnings
 from app.pii import scan
+from app.roster import assign
 warnings.filterwarnings("ignore")
 
 def _parse_json(raw: str) -> dict:
@@ -275,6 +276,8 @@ def decide(state:State) -> dict:
             decision = {"action": "auto_send"}
     #print("DECISION:", decision)
     #print("decide ran")
+    if not err and decision["action"] == "escalate":
+        decision["assignee"] = assign(c["priority"], state["ticket"].ticket_id)
     return {"decision":decision,"audit":["decide done"]}
 
 def learn(state: State) -> dict:
@@ -377,7 +380,10 @@ def print_result(final: dict) -> None:
     print(f"  Action : {d['action']}")
     if d.get("reason"):
         print(f"  Reason : {d['reason']}")
-    
+    if d.get("assignee"):
+        a = d["assignee"]
+        print(f" Assigned : {a['name']} ({a['tier']} tier)")
+
     print("\nLEARNING")
     print(f"  Filed back into KB : {final.get('learned', False)}")
 
