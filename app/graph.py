@@ -8,6 +8,7 @@ from app.kb import search, index_resolved
 import warnings
 from app.pii import scan
 from app.roster import assign
+from app.audit import verify
 warnings.filterwarnings("ignore")
 
 def _parse_json(raw: str) -> dict:
@@ -386,6 +387,14 @@ def print_result(final: dict) -> None:
 
     print("\nLEARNING")
     print(f"  Filed back into KB : {final.get('learned', False)}")
+
+    print("\nAUDIT TRAIL")
+    log = final.get("audit", [])
+    for e in log:
+        print(f" {e['hash'][:8]} {e['step']}")
+    broken = verify(log)
+    print(f" Chain:{'intact' if broken < 0 else f'BROKEN at step {broken}'}")
+    
 
 if __name__=="__main__":
     initial_state = {

@@ -1,7 +1,7 @@
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Literal, TypedDict, Annotated
-from operator import add
+from app.audit import chain
 
 class Ticket(BaseModel):
     ticket_id: str #unique id for this ticket
@@ -23,7 +23,7 @@ class State(TypedDict):
     compliance:dict #agent 4's pass/fail
     decision: dict #auto send vs escalate
     review_count: int #how many times the review gate has run (caps the regen retry)
-    audit: Annotated[list,add]  #append only to make ticket longer
+    audit: Annotated[list,chain]  #append only to make ticket longer
     raw_input: dict #the messy inbound payload, before intake turns it into a Ticket
     error: str | None #why the intake rejected this input
     learned: bool #True if this resolved ticket was filed into the KB 
