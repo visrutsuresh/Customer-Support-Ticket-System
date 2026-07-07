@@ -222,7 +222,7 @@ def review(state:State) -> dict:
     #data-privacy :an outbound reply must not carry PII (echoed sensitive data, or another customer's data leaked in)
     leaked = scan(draft)
     if leaked:
-        issues.append("reply exposes PI: " + ", ".join(leaked))
+        issues.append("reply exposes PII: " + ", ".join(leaked))
 
     # full-policy judgement on the check model (14B in local/full, 3B in dev)
     policy = open("policy.md").read()
@@ -394,7 +394,7 @@ def print_result(final: dict) -> None:
         print(f" {e['hash'][:8]} {e['step']}")
     broken = verify(log)
     print(f" Chain:{'intact' if broken < 0 else f'BROKEN at step {broken}'}")
-    
+
 
 if __name__=="__main__":
     initial_state = {
