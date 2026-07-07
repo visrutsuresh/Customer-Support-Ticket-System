@@ -90,17 +90,63 @@ def score_difficulty(state: State) -> dict:
 def detect_sensitivity(state: State) -> dict:
     t = state["ticket"]
     c = state["classification"]
+
+    #1 deterministic: regex PII + senstitive category ( free,always runs but matches against known expression patterns)
     pii = scan(f"{t.subject} {t.body}")
     category_hit = c["category"] in {"refund", "billing", "account"}
-    is_sensitive = bool(pii) or category_hit
+    
+    # 2 model judgement: catches contextual sensitivity that the regex misses 
+    sensitive_info = """
+    - Financial account data: bank account or routing
+    numbers, full card numbers, tax IDs, salary or income figures
+    - Government or identity data: national ID / SSN, passport, driver's
+    license, date of birth
+    - Health or medical data: any medical condition, diagnosis,
+    disability, treatment, or prescription
+    - Authentication data: passwords, PINs, security-question answers,
+    one-time / 2FA codes, API keys or tokens
+    - Legal matters: lawsuits, legal threats, law-enforcement or
+    regulatory complaints
+    - Protected personal traits: home address, race or ethnicity,
+    religion, sexual orientation, immigration status, political views"""
+
+    prompt = f"""Decide if this support ticket contains or disucsses sensitive information.
+    Treat any of the following as sensitive:
+    {sensitive_info}
+
+    Respond with ONLY a JSON object with keys sensitive, types, reason.
+    sensitive is true or false. types is a list of the atching categories above (empty if none).
+    reason is one short phrase. No other text.
+
+    Subject: {t.subject}
+    Body: {t.body}
+    """
+
+    try:
+        llm = _parse_json(router.think(prompt))
+        llm_sensitive = bool(llm.get("sensitive"))
+    except Exception:
+        llm, llm_sensitive = {}, False #parse failed; regex + category still guard
+    
+    is_sensitive = bool(pii) or category_hit or llm_sensitive
 
     reasons =[]
     if pii:
         reasons.append("PII found:" + ", ".join(pii))
     if category_hit:
         reasons.append(f"sensitive category: {c['category']}")
+    if llm_sensitive:
+        types = llm.get("types") or []
+        if isinstance(types, str):
+            types=[types]
+        reasons.append(f"model flagged: {', '.join(types) or 'unspecified'}")
 
-    sensitivity = {"is_sensitive": is_sensitive, "pii_types": pii, "reason": "; ".join(reasons) or "none"}
+
+    sensitivity = {
+        "is_sensitive": is_sensitive,
+        "pii_types": pii,
+        "reason": "; ".join(reasons) or "none"
+        }
     return {"sensitivity": sensitivity,"audit": ["detect_sensitivity done"]}
 
 def route(state:State) -> dict:
@@ -296,6 +342,11 @@ def print_result(final: dict) -> None:
     print(f" PII types: {','.join(s['pii_types']) or 'none'}")
     print(f" Reason   : {s['reason']}")
 
+    diff = final["difficulty"]
+    print("\nDIFFICULTY")
+    print(f" Level : {diff['level'].title()}")
+    print(f" Reason: {diff.get('reason', '')}")
+    
     r = final["routing"]
     print("\nROUTING")
     print(f"  Lane  : {r['lane']}")

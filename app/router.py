@@ -10,8 +10,8 @@ REVIEW_URL = os.environ["REVIEW_LANE_URL"]
 MODEL_TIER = os.getenv("MODEL_TIER", "dev").lower()
 
 # Claude model ids for the cloud lane
-HAIKU = "claude-3-5-haiku-latest"
-SONNET = "claude-sonnet-4-5"
+HAIKU = "claude-haiku-4-5"
+SONNET = "claude-sonnet-4-6"
 
 def _modal(url:str, prompt: str, max_new_tokens: int) -> str:
     resp = requests.post(
