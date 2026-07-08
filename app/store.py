@@ -60,3 +60,24 @@ def get(ticket_id: str) -> dict | None:
         cur.execute("SELECT state FROM tickets WHERE ticket_id = %s", (ticket_id,))
         row = cur.fetchone()
     return row["state"] if row else None
+
+def set_status(ticket_id: str, status: str) -> bool:
+    # human reviewer verdict: approved / rejected
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE tickets SET human_status = %s WHERE ticket_id = %s",
+            (status, ticket_id),
+        )
+        return cur.rowcount > 0
+
+def edit_reply(ticket_id: str, new_reply: str) -> bool:
+    # reviewer rewrites the draft: patch draft.reply inside the jsonb state, mark edited
+    with _connect() as conn:
+        cur = conn.execute(
+            """UPDATE tickets
+               SET state = jsonb_set(state, '{draft,reply}', to_jsonb(%s::text)),
+                   human_status = 'edited'
+               WHERE ticket_id = %s""",
+            (new_reply, ticket_id),
+        )
+        return cur.rowcount > 0
