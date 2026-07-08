@@ -1,9 +1,9 @@
 import os
-import psycopg
+import psycopg #type:ignore
 from dotenv import load_dotenv
 from fastapi.encoders import jsonable_encoder
-from psycopg.types.json import Jsonb
-from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb #type:ignore
+from psycopg.rows import dict_row #type:ignore
 
 load_dotenv()
 DATABASE_URL = os.environ["DATABASE_URL"]
