@@ -1,4 +1,5 @@
 from app.graph import graph, print_result
+from app.adapters import ZendeskAdapter
 
 tickets = [
     {"source": "email", "name": "Alice Tan",   "email": "alice@example.com", "subject": "Cannot log in", "body": "my password reset link is broken"},
@@ -14,3 +15,16 @@ for i,raw in enumerate(tickets, start =1):
     print(f"\n\n########## TICKET {i} of {len(tickets)} ##########")
     final = graph.invoke({"raw_input": raw, "audit":[]})
     print_result(final) 
+
+# req 29: a Zendesk-shaped payload enters through the adapter seam, then runs
+# through the exact same pipeline as every other ticket
+zendesk_payload = {"ticket": {
+    "id": 55021,
+    "subject": "Double charged this month",
+    "description": "I was billed twice for my subscription, please refund one charge.",
+    "via": {"channel": "email"},
+    "requester": {"id": 4471, "name": "Hana Sato", "email": "hana@example.com"},
+}}
+print("\n\n########## TICKET (via Zendesk adapter) ##########")
+final = graph.invoke({"raw_input": ZendeskAdapter().to_canonical(zendesk_payload), "audit": []})
+print_result(final)
