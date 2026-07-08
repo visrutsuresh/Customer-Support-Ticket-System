@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.138.2",
     "fastembed>=0.8.0",
     "langgraph>=1.2.7",
+    "psycopg[binary]>=3.3.4",
     "uvicorn[standard]>=0.49.0",
     "weaviate-client>=4.22.0",
 ]

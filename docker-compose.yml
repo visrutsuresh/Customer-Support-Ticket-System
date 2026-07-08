@@ -1,6 +1,7 @@
 # Local Weaviate (vector database) for the #1 Customer Support app.
 # Runs entirely on your machine via Docker. No cloud account, no API key.
 # Start:  docker compose up -d      Stop:  docker compose down
+name: customer-[REDACTED_SQL_PASSWORD_1]-ticket-system
 services:
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.38.2
@@ -19,5 +20,18 @@ services:
     volumes:
       - weaviate_data:/var/lib/weaviate
 
+  postgres:
+    image: postgres:17
+    ports:
+      - "5432:5432"
+    restart: on-failure:0
+    environment:
+      POSTGRES_USER: support
+      POSTGRES_PASSWORD: support
+      POSTGRES_DB: tickets
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
 volumes:
   weaviate_data:
+  pgdata:
