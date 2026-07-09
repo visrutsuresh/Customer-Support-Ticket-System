@@ -66,7 +66,7 @@ export default async function TicketDetail({
           {s.draft.reply}
         </div>
       </section>
-      <Actions id={id} />
+      <Actions id={id} reply={s.draft.reply ?? ""} />
     </main>
   );
 }
