@@ -25,19 +25,22 @@ export default async function Home() {
   return (
     <main className="max-w-4xl mx-auto p-8">
       <h1 className="text-2xl font-semibold mb-6">Ticket Queue</h1>
+      <a href="/new" className="text-blue-600 text-sm">
+        + New ticket
+      </a>
       <ul className="space-y-3">
         {tickets.map((t) => (
           <li key={t.ticket_id}>
-          <Link
-            href={`/tickets/${t.ticket_id}`}
-            className="block border rounded-lg p-4 hover:bg-gray-50"
-          >
-            <div className="font-medium">{t.subject}</div>
-            <div className="text-sm text-gray-500">
-              {t.category} · {t.priority} · {t.action} · {t.human_status}
-            </div>
-          </Link>
-        </li>
+            <Link
+              href={`/tickets/${t.ticket_id}`}
+              className="block border rounded-lg p-4 hover:bg-gray-50"
+            >
+              <div className="font-medium">{t.subject}</div>
+              <div className="text-sm text-gray-500">
+                {t.category} · {t.priority} · {t.action} · {t.human_status}
+              </div>
+            </Link>
+          </li>
         ))}
       </ul>
     </main>

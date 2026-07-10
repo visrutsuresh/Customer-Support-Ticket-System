@@ -37,7 +37,7 @@ TIER_FOR_PRIORITY = {
     "critical" : "senior",
     "high" : "senior",
     "medium": "mid",
-    "low": "low",
+    "low": "junior",
 }
 
 def assign(priority: str, ticket_id: str) -> dict:
