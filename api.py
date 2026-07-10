@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+import uuid
+from datetime import datetime,timezone
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.graph import graph
@@ -27,11 +29,18 @@ def health():
     return {"status": "ok"}
 
 @app.post("/tickets")
-def create_ticket(payload: TicketIn):
-    final = graph.invoke({"raw_input": payload.model_dump(), "audit": []})
+def create_ticket(payload: TicketIn, background: BackgroundTasks):
+    ticket_id = f"T-{uuid.uuid4().hex[:8]}"
+    store.save_pending(ticket_id, payload.subject, payload.body,
+                       payload.source, payload.name, payload.email,
+                       datetime.now(timezone.utc))
+    background.add_task(_process, ticket_id, payload.model_dump())
+    return {"ticket_id": ticket_id, "status": "processing"}
+
+def _process(ticket_id: str, raw: dict):
+    final = graph.invoke({"raw_input": {**raw, "ticket_id": ticket_id}, "audit": []})
     if final.get("ticket") is not None:
         store.save(final)
-    return final
 
 @app.get("/tickets")
 def list_tickets():

@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function NewTicket() {
   const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setSubmitting(true);
     const form = new FormData(e.currentTarget);
     await fetch("http://localhost:8000/tickets", {
       method: "POST",
@@ -43,15 +46,21 @@ export default function NewTicket() {
         <input
           name="name"
           placeholder="Customer name"
+          required
           className="w-full border rounded p-2"
         />
         <input
           name="email"
+          type="email"
           placeholder="Customer email"
+          required
           className="w-full border rounded p-2"
         />
-        <button className="px-4 py-2 rounded bg-green-600 text-white">
-          Submit
+        <button
+          disabled={submitting}
+          className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-50"
+        >
+          {submitting ? "Submitting..." : "Submit"}
         </button>
       </form>
     </main>

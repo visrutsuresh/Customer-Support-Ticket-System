@@ -46,6 +46,21 @@ def save(state: dict) -> None:
              Jsonb(jsonable_encoder(state))),
         )
 
+def save_pending(ticket_id, subject, body, source, name, email, created_at) -> None:
+    # store a ticket as "processing" BEFORE the pipeline runs, so the customer's submit is instant
+    minimal = {
+        "ticket": {"subject": subject, "body": body, "source": source,
+                   "customer_name": name, "customer_email": email},
+        "classification": {}, "decision": {}, "draft": {},
+    }
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO tickets (ticket_id, subject, human_status, created_at, state)
+               VALUES (%s, %s, 'processing', %s, %s)
+               ON CONFLICT (ticket_id) DO NOTHING""",
+            (ticket_id, subject, created_at, Jsonb(minimal)),
+        )
+
 def list_all() -> list[dict]:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
@@ -81,3 +96,15 @@ def edit_reply(ticket_id: str, new_reply: str) -> bool:
             (new_reply, ticket_id),
         )
         return cur.rowcount > 0
+
+def save_pending(ticket_id, subject, body, source, name, email, created_at) -> None:
+    minimal = {"ticket":{"subject":subject,"body":body,"source":source,"customer_name":name,"customer_email":email},
+     "classification":{},"decision":{},"draft":{},
+    }
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO tickets(ticket_id,subject,human_status,created_at,state)
+                VALUES (%s,%s,'processing',%s,%s)
+                ON CONFLICT (ticket_id) DO NOTHING""",
+            (ticket_id, subject, created_at, Jsonb(minimal)),
+        )

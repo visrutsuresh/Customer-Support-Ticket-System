@@ -12,7 +12,7 @@ def normalize(raw: dict) -> Ticket:
         subject=raw["subject"]
         body=raw["body"]
     return Ticket(
-        ticket_id=f"T-{uuid.uuid4().hex[:8]}",
+        ticket_id=raw.get("ticket_id") or f"T-{uuid.uuid4().hex[:8]}",
         source=source,
         subject=subject,
         body=body,

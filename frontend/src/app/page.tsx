@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AutoRefresh from "./auto-refresh";
 
 type Ticket = {
   ticket_id: string;
@@ -24,6 +25,7 @@ export default async function Home() {
 
   return (
     <main className="max-w-4xl mx-auto p-8">
+      <AutoRefresh />
       <h1 className="text-2xl font-semibold mb-6">Ticket Queue</h1>
       <a href="/new" className="text-blue-600 text-sm">
         + New ticket
