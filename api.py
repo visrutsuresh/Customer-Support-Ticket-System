@@ -73,3 +73,7 @@ def edit_ticket(ticket_id: str, payload: EditIn):
     if not store.edit_reply(ticket_id, payload.reply):
         raise HTTPException(status_code=404, detail="ticket not found")
     return {"ticket_id": ticket_id, "human_status": "edited"}
+
+@app.get("/metrics")
+def get_metrics():
+    return store.metrics()

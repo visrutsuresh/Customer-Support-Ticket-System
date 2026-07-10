@@ -96,3 +96,26 @@ def edit_reply(ticket_id: str, new_reply: str) -> bool:
             (new_reply, ticket_id),
         )
         return cur.rowcount > 0
+
+def metrics() -> dict:
+    with _connect() as conn:
+        cur= conn.cursor(row_factory=dict_row)
+        cur.execute("""
+        SELECT
+         COUNT(*)    AS total,
+         COUNT(*) FILTER (WHERE action = 'escalate') AS escalated,
+         COUNT(*) FILTER (WHERE action = 'auto_send') AS auto_resolved
+        FROM tickets
+        """)
+        result = cur.fetchone()
+
+        cur.execute("""
+        SELECT category, COUNT(*) AS n
+        FROM tickets
+        WHERE category  IS NOT NULL
+        GROUP BY category
+        ORDER BY n DESC
+        """)
+        by_category = cur.fetchall()
+
+        return {**result, "by_category": by_category}
