@@ -4,6 +4,7 @@ from app.state import State
 from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
 from app import router
+from app.pii import scan
 from app.agents import (classify_agent, retrieve_agent, generate_agent,
                         review_agent, learn_agent)
 
@@ -22,6 +23,18 @@ def node_classify(state: State) -> dict:
     c = classify_agent(state["ticket"])
     c = {k: (v.lower() if isinstance(v, str) else v) for k, v in c.items()}   # match old normalization
     return {"classification": c, "audit": ["classify (agent) done"]}
+
+def node_route(state: State) -> dict:
+    # 2x2 routing, deterministic: agent's opinion + a hard PII/category floor for privacy.
+    t, c = state["ticket"], state["classification"]
+    pii = scan(f"{t.subject} {t.body}")
+    category_hit = c.get("category") in {"refund", "billing"}
+    is_sensitive = bool(pii) or category_hit or bool(c.get("sensitive"))
+    lane = "private" if is_sensitive else "cloud"
+    tier = c.get("difficulty", "simple")
+    return {"sensitivity": {"is_sensitive": is_sensitive, "pii_types": pii},
+            "routing": {"lane": lane, "tier": tier, "model": router.intended_model(lane, tier)},
+            "audit": ["route done (2x2, folded)"]}
 
 def node_retrieve(state: State) -> dict:
     return {"retrieval": retrieve_agent(state["ticket"]), "audit": ["retrieve (agent) done"]}
@@ -67,7 +80,7 @@ def node_learn(state: State) -> dict:
 
 # --- the orchestrator: pick the next agent given what is already done (dynamic, LLM-driven) ---
 
-NODES = ["classify", "retrieve", "generate", "review", "decide", "learn"]
+NODES = ["classify", "route", "retrieve", "generate", "review", "decide", "learn"]
 
 def route_next(state: State) -> str:
     if state.get("error"):
@@ -75,6 +88,7 @@ def route_next(state: State) -> str:
 
     # plain code walks the obvious sequence, no AI needed
     if state.get("classification") is None: return "classify"
+    if state.get("routing")        is None: return "route"
     if state.get("retrieval")      is None: return "retrieve"
     if state.get("draft")          is None: return "generate"
     if state.get("compliance")     is None: return "review"
@@ -98,7 +112,7 @@ def route_next(state: State) -> str:
 
 _b = StateGraph(State)
 _b.add_node("intake", node_intake)
-for _n, _fn in [("classify", node_classify), ("retrieve", node_retrieve),
+for _n, _fn in [("classify", node_classify), ("route", node_route), ("retrieve", node_retrieve),
                 ("generate", node_generate), ("review", node_review),
                 ("decide", node_decide), ("learn", node_learn)]:
     _b.add_node(_n, _fn)

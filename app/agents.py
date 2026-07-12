@@ -13,7 +13,7 @@ def _parse(raw:str) -> dict:
 
 CLASSIFY_SYSTEM = """
 You are the Classification and Prioritization agent for customer support.
-Decide the ticket's category, priority, business_impact, and sentiment.
+Decide the ticket's category, priority, business_impact, sentiment, difficulty, and whether it is sensitive.
 You MAY look the customer up first to inform priority (a premium customer, or money at stake, raises it).
 
 Tool available:
@@ -21,13 +21,16 @@ Tool available:
 
 Reply every turn with ONE JSON object, nothing else.
   To use the tool:  {"thought": "...", "action": "crm_lookup", "args": {"email": "<email>"}}
-  To finish:        {"thought": "...", "action": "finish", "result": {"category": "...", "priority": "...", "business_impact": "...", "sentiment": "..."}}
+  To finish:        {"thought": "...", "action": "finish", "result": {"category": "...", "priority": "...", "business_impact": "...", "sentiment": "...", "difficulty": "...", "sensitive": true}}
 
 Definitions:
   category:        [billing, technical, account, general, shipping, refund, feature_request, complaint]
   priority:        [Critical, High, Medium, Low]
   business_impact: [low, medium, high]
   sentiment:       [positive, neutral, negative]
+  difficulty:      simple = a routine self-serve request a KB article answers in one step (password reset, order status).
+                   complex = needs judgement, multiple steps, investigation, or careful handling (angry refund, account recovery, vague "nothing works", anything with money or a frustrated customer).
+  sensitive:       true if the ticket contains or discusses sensitive data (financial/card/bank, government ID, health, passwords/2FA, legal matters, protected personal traits), else false.
 """
 
 def classify_agent(ticket) -> dict:
@@ -47,7 +50,8 @@ def classify_agent(ticket) -> dict:
         transcript += f"\nYou called {move.get('action')} ({move.get('args',{})}) -> {obs}"
     
     #fallback: it never finished in MAX_STEPS return a safe default
-    return {"category": "general", "priority": "Medium", "business_impact" : "medium", "sentiment" : "neutral"}
+    return {"category": "general", "priority": "Medium", "business_impact": "medium",
+            "sentiment": "neutral", "difficulty": "simple", "sensitive": False}
 
 RETRIEVE_SYSTEM = """
 You are the Knowledge Retrieval agent for customer support.
