@@ -199,15 +199,17 @@ Reply with ONE JSON object, nothing else:
 """
 
 def learn_agent(ticket, draft_reply, resolved: bool) -> dict:
-    # only learn from a genuinely resolved ticket (auto-sent answer, or a human-accepted reply)
     if not resolved or not draft_reply:
         return {"learned": False, "reason": "ticket not resolved"}
-    prompt = (f"{LEARN_SYSTEM}\n"
+    # autonomous quality gate: is this resolution worth keeping?
+    prompt = (f"A support ticket was resolved. Decide if its resolution is general and reusable "
+              f"enough to help future tickets (not a one-off, no sensitive personal data).\n"
               f"Ticket: {ticket.subject} - {ticket.body}\n"
-              f"Resolution sent: {draft_reply}\n"
-              f"Your JSON:")
-    move = _parse(router.think(prompt, max_new_tokens=512))
+              f"Resolution: {draft_reply}\n"
+              f'Reply with ONE JSON object: {{"thought":"...","save":true}} or {{"thought":"...","save":false}}')
+    move = _parse(router.think(prompt, max_new_tokens=256))
     if move.get("save"):
-        index_resolved(move.get("title", ticket.subject), move.get("content", draft_reply))
-        return {"learned": True, "title": move.get("title")}
+        content = f"Problem: {ticket.body} Resolution: {draft_reply}"
+        index_resolved(ticket.subject, content)      # stays a resolved-ticket record, source preserved
+        return {"learned": True}
     return {"learned": False, "reason": "not general enough"}
