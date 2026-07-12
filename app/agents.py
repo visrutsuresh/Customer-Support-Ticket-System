@@ -1,4 +1,6 @@
 import json 
+import re
+from app.pii import scan
 from app import router, tools
 
 MAX_STEPS = 5
@@ -137,3 +139,49 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex") -> dict:
         else:
             transcript += f"\nunknown action {move.get('action')!r}"
     return {"kind": "escalate", "reply": ""}      # fallback: never decided
+
+REVIEW_SYSTEM = """
+You are the Compliance and Quality Review agent for customer support.
+Check the draft reply against the policy rules AND for factual accuracy.
+You MAY look the customer up to verify any claim the reply makes about their account or orders.
+
+Tool available:
+  crm_lookup(email) -> customer record (tier, orders) or null
+
+Reply every turn with ONE JSON object, nothing else.
+  To use the tool: {"thought":"...","action":"crm_lookup","args":{"email":"<email>"}}
+  To finish:       {"thought":"...","action":"finish","result":{"verdict":"pass|fail","issues":["<reason>", ...]}}
+FAIL if the reply breaks a policy rule, or states something about the customer's account/orders
+that the CRM contradicts. Asking the customer for information is allowed and PASSES. When unsure, PASS.
+"""
+
+def review_agent(ticket, draft_reply) -> dict:
+    # deterministic safety checks (always run, never optional)
+    issues = []
+    if re.search(r"\[[A-Za-z0-9 _/]+\]", draft_reply):
+        issues.append("contains an unfilled placeholder in square brackets")
+    if "The Support Team" not in draft_reply:
+        issues.append("missing the 'The Support Team' sign-off")
+    leaked = scan(draft_reply)
+    if leaked:
+        issues.append("reply exposes PII: " + ", ".join(leaked))
+
+    # autonomous policy + fact-check pass
+    policy = open("policy.md").read()
+    context = (f"Customer email: {ticket.customer_email}\n"
+               f"Ticket: {ticket.subject} - {ticket.body}\n"
+               f"Draft reply to check:\n{draft_reply}")
+    transcript = ""
+    for _ in range(MAX_STEPS):
+        prompt = f"{REVIEW_SYSTEM}\n\nPolicy:\n{policy}\n\n{context}\n{transcript}\nYour JSON:"
+        move = _parse(router.think(prompt, max_new_tokens=512))
+        if move.get("action") == "finish":
+            if move["result"].get("verdict") == "fail":
+                issues.extend(move["result"].get("issues", []))
+            break
+        if move.get("action") == "crm_lookup":
+            transcript += f"\ncrm_lookup -> {tools.crm_lookup(**move.get('args', {}))}"
+        else:
+            transcript += f"\nunknown action {move.get('action')!r}"
+
+    return {"verdict": "fail" if issues else "pass", "issues": issues}
