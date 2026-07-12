@@ -2,6 +2,7 @@ import json
 import re
 from app.pii import scan
 from app import router, tools
+from app.kb import index_resolved
 
 MAX_STEPS = 5
 
@@ -185,3 +186,28 @@ def review_agent(ticket, draft_reply) -> dict:
             transcript += f"\nunknown action {move.get('action')!r}"
 
     return {"verdict": "fail" if issues else "pass", "issues": issues}
+
+LEARN_SYSTEM = """You are the Learning agent for customer support.
+A ticket has just been resolved. Decide whether its problem+solution is worth saving to the
+knowledge base to help FUTURE tickets. Save ONLY if it is general and reusable (not a one-off,
+no personal data, no customer-specific details). If worth saving, write a concise reusable article.
+
+Reply with ONE JSON object, nothing else:
+  {"thought":"...", "save": true, "title":"<short general title>", "content":"<concise problem + solution, no personal data>"}
+  or
+  {"thought":"...", "save": false}
+"""
+
+def learn_agent(ticket, draft_reply, resolved: bool) -> dict:
+    # only learn from a genuinely resolved ticket (auto-sent answer, or a human-accepted reply)
+    if not resolved or not draft_reply:
+        return {"learned": False, "reason": "ticket not resolved"}
+    prompt = (f"{LEARN_SYSTEM}\n"
+              f"Ticket: {ticket.subject} - {ticket.body}\n"
+              f"Resolution sent: {draft_reply}\n"
+              f"Your JSON:")
+    move = _parse(router.think(prompt, max_new_tokens=512))
+    if move.get("save"):
+        index_resolved(move.get("title", ticket.subject), move.get("content", draft_reply))
+        return {"learned": True, "title": move.get("title")}
+    return {"learned": False, "reason": "not general enough"}
