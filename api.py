@@ -1,12 +1,18 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
+import os
 import uuid
 from datetime import datetime,timezone
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.graph import graph
+from app.orchestrator import graph_auto
 from app import store
 
 store.init_db()  # make sure the tickets table exists when the API boots
+
+# AGENT_MODE toggle: deterministic (fixed LangGraph pipeline) | autonomous (5 ReAct agents + orchestrator)
+AGENT_MODE = os.getenv("AGENT_MODE", "deterministic").lower()
+active_graph = graph_auto if AGENT_MODE == "autonomous" else graph
 
 app = FastAPI(title="Support Ticket Triage API")
 
@@ -26,7 +32,7 @@ class TicketIn(BaseModel):
 
 @app.get("/")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "mode": AGENT_MODE}
 
 @app.post("/tickets")
 def create_ticket(payload: TicketIn, background: BackgroundTasks):
@@ -38,7 +44,10 @@ def create_ticket(payload: TicketIn, background: BackgroundTasks):
     return {"ticket_id": ticket_id, "status": "processing"}
 
 def _process(ticket_id: str, raw: dict):
-    final = graph.invoke({"raw_input": {**raw, "ticket_id": ticket_id}, "audit": []})
+    final = active_graph.invoke(
+        {"raw_input": {**raw, "ticket_id": ticket_id}, "audit": []},
+        {"recursion_limit": 40},
+    )
     if final.get("ticket") is not None:
         store.save(final)
 
