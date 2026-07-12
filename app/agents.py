@@ -168,7 +168,8 @@ def review_agent(ticket, draft_reply) -> dict:
         issues.append("reply exposes PII: " + ", ".join(leaked))
 
     # autonomous policy + fact-check pass
-    policy = open("policy.md").read()
+    with open("policy.md") as f:
+        policy = f.read()
     context = (f"Customer email: {ticket.customer_email}\n"
                f"Ticket: {ticket.subject} - {ticket.body}\n"
                f"Draft reply to check:\n{draft_reply}")
