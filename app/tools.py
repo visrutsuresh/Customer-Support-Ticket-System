@@ -1,4 +1,4 @@
-from app import crm
+from app import crm,kb
 
 TOOLS = {} #name -> function (the phone book)
 
@@ -23,3 +23,7 @@ def run_tool(name:str,  args:dict) -> str:
     except Exception as e:
         return f"ERROR: {e}"
 
+@tool
+def kb_search(query:str) -> list:
+    #Search the knowledge base + past resolved tickets. Returns ranked articles.
+    return kb.search(query)
