@@ -108,7 +108,7 @@ Reply every turn with ONE JSON object, nothing else.
   To finish:       {"thought":"...","action":"finish","result":{"kind":"answer|question|escalate","notes":"<what to say, what is missing, or why escalate>"}}
 """
 
-def _write_reply(ticket,articles,customer,notes,lane,tier) -> str:
+def _write_reply(ticket,articles,customer,notes,lane,tier,convo="") -> str:
     kb_text = "\n\n".join(f"[{a['title']}]\n{a['content']}" for a in articles)
     greeting = f"Hi {ticket.customer_name.split()[0]}," if ticket.customer_name else "Hi there,"
     cust = (f"tier={customer['tier']}, orders={customer['orders']}"
@@ -119,15 +119,23 @@ def _write_reply(ticket,articles,customer,notes,lane,tier) -> str:
     Subject: {ticket.subject}
     Body: {ticket.body}
     Guidance from triage: {notes}
+    Conversation so far (oldest first):
+    {convo}
+    The last line above is the customer's latest message. Reply to that, using the earlier turns for context. Do not repeat a solution you already gave, and do not contradict an earlier reply.
     Use ONLY these knowledge base articles, do not invent details:
     {kb_text}
     Open with exactly "{greeting}" and sign off as 'The Support Team'. No placeholders like [NAME.
     """
     return router.generate_reply(prompt,lane,tier)
 
-def generate_agent(ticket, articles, lane="cloud", tier="complex") -> dict:
+def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None) -> dict:
+    convo = "\n".join(
+        f"{'Customer' if m['role'] == 'customer' else 'Support'}: {m['body']}"
+        for m in (history or [])
+    )
     context = (f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n"
-                f"  subject: {ticket.subject}\n body{ticket.body}")
+                f"  subject: {ticket.subject}\n body: {ticket.body}\n"
+                f"Conversation so far (oldest first):\n{convo}")
     transcript,customer="", None
     for _ in range(MAX_STEPS):
         move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}\nYour JSON:",max_new_tokens=512))
@@ -136,7 +144,7 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex") -> dict:
             kind = r.get("kind", "escalate")
             if kind == "escalate":
                 return {"kind": "escalate", "reply": ""}
-            reply = _write_reply(ticket, articles, customer, r.get("notes", ""), lane, tier)
+            reply = _write_reply(ticket, articles, customer, r.get("notes", ""), lane, tier, convo)
             return {"kind": kind, "reply": reply.strip()}
         if move.get("action") == "crm_lookup":
             customer = tools.crm_lookup(**move.get("args", {}))

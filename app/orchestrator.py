@@ -41,7 +41,7 @@ def node_retrieve(state: State) -> dict:
 
 def node_generate(state: State) -> dict:
     r = state.get("routing") or {"lane": "cloud", "tier": "complex"}   # 2x2 wired in the next step
-    draft = generate_agent(state["ticket"], state["retrieval"], r["lane"], r["tier"])
+    draft = generate_agent(state["ticket"], state["retrieval"], r["lane"], r["tier"], state.get("messages", []))
     return {"draft": draft, "audit": ["generate (agent) done"]}
 
 def node_review(state: State) -> dict:
@@ -72,11 +72,8 @@ def node_decide(state: State) -> dict:
     return {"decision": decision, "audit": ["decide done"]}
 
 def node_learn(state: State) -> dict:
-    d = state.get("decision", {})
-    kind = state.get("draft", {}).get("kind")
-    resolved = d.get("action") == "auto_send" and kind == "answer"
-    out = learn_agent(state["ticket"], state.get("draft", {}).get("reply", ""), resolved)
-    return {"learned": out.get("learned", False), "audit": ["learn done"]}
+    # KB write-back is deferred to the /resolve action, not fired on every auto_send
+    return {"learned": False, "audit": ["learn: deferred to resolve"]}
 
 # --- the orchestrator: pick the next agent given what is already done (dynamic, LLM-driven) ---
 

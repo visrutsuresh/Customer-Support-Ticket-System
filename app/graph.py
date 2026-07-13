@@ -293,14 +293,8 @@ def decide(state:State) -> dict:
     return {"decision":decision,"audit":["decide done"]}
 
 def learn(state: State) -> dict:
-    d = state["decision"]
-    draft = state.get("draft", {})
-    if d.get("action") == "auto_send" and draft.get("kind") == "answer":
-        t = state["ticket"]
-        content = f"Problem: {t.body} Resolution: {draft["reply"]}"
-        index_resolved(t.subject,content)
-        return {"learned": True, "audit": ["learn:index resolved ticket"]}
-    return {"learned": False, "audit": ["learn: skipped, not a clean auto-answer"]}
+    # KB write-back is deferred to the /resolve action; one auto_send is not a resolved conversation
+    return {"learned": False, "audit": ["learn: deferred to resolve"]}
 
 #building the graph
 builder = StateGraph(State)

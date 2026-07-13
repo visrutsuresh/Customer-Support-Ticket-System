@@ -74,9 +74,14 @@ def list_all() -> list[dict]:
 def get(ticket_id: str) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT state FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        cur.execute("SELECT state, human_status, lifecycle FROM tickets WHERE ticket_id = %s", (ticket_id,))
         row = cur.fetchone()
-    return row["state"] if row else None
+    if row is None:
+        return None
+    state = row["state"]
+    state["human_status"] = row["human_status"]
+    state["lifecycle"] = row["lifecycle"]
+    return state
 
 def set_status(ticket_id: str, status: str) -> bool:
     # human reviewer verdict: approved / rejected

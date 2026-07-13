@@ -8,6 +8,8 @@ from app.graph import graph
 from app.orchestrator import graph_auto
 from app import store
 from app.router import MODEL_TIER
+from app.agents import learn_agent
+from app.state import Ticket
 
 store.init_db()  # make sure the tickets table exists when the API boots
 
@@ -121,3 +123,18 @@ def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks
     store.append_message(ticket_id,"customer",payload.body) #message thread grows & lifecycle -> open
     background.add_task(_reprocess,ticket_id, payload.body)
     return {"ticket_id": ticket_id, "status" : "processing"}
+
+@app.post("/tickets/{ticket_id}/resolve")
+def resolve_ticket(ticket_id: str):
+    state = store.get(ticket_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    if state.get("lifecycle") == "resolved":        # already filed, do not double-write
+        return {"ticket_id": ticket_id, "lifecycle": "resolved", "learned": False, "note": "already resolved"}
+    store.set_lifecycle(ticket_id, "resolved")
+    # write-back the resolution we actually sent (last agent turn), quality-gated
+    ticket = Ticket(**state["ticket"])
+    agent_msgs = [m["body"] for m in state.get("messages", []) if m["role"] == "agent"]
+    resolution = agent_msgs[-1] if agent_msgs else (state.get("draft") or {}).get("reply", "")
+    out = learn_agent(ticket, resolution, resolved=True)
+    return {"ticket_id": ticket_id, "lifecycle": "resolved", "learned": out.get("learned", False)}
