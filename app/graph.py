@@ -173,6 +173,11 @@ def generate(state:State) -> dict:
     hits = state["retrieval"]
     kb_text = "\n\n".join(f"[{h['title']}]\n{h['content']}" for h in hits)
 
+    history = state.get("messages", [])
+    convo = "\n".join(
+        f"{'Customer' if m['role'] == 'customer' else 'Support'}:{m['body']}" for m in history
+    )
+
     greeting = f"Hi {t.customer_name.split()[0]}," if t.customer_name else "Hi there!"
 
     prompt=f"""
@@ -183,6 +188,12 @@ def generate(state:State) -> dict:
         Sentiment:{c["sentiment"]}
     Subject: {t.subject}
     Body: {t.body}
+
+    Conversation so far (oldest first):
+    {convo}
+
+    The last line above is the customer's latest message.
+    Reply to that, using the earlier turns for context. Do not repeat a solution you already gave, and do not contradict an earlier reply.
 
     Use ONLY the knowledge base articles below to answer. If they do not cover the question, say you will escalate to a specialist rather than inventing details. Mention which article you relied on by its title.
 

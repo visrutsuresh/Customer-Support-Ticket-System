@@ -29,3 +29,5 @@ class State(TypedDict):
     learned: bool #True if this resolved ticket was filed into the KB 
     sensitivity: dict #PII scan + category heuristic result, set before routing
     difficulty: dict #LLM difficulty score (simple vs complex)
+    messages: list #List of past messages in the conversation. oldest first.
+    lifecycle: str #state of the ticket -open, awaiting_customer, resolved

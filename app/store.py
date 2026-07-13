@@ -22,10 +22,12 @@ def init_db():
                 action TEXT,
                 assignee TEXT,
                 human_status TEXT,
+                lifecycle TEXT DEFAULT 'open',
                 created_at TIMESTAMPTZ,
                 state JSONB
             )
         """)
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS lifecycle TEXT DEFAULT 'open'")
 
 def save(state: dict) -> None:
     t = state["ticket"]
@@ -65,7 +67,7 @@ def list_all() -> list[dict]:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute("""SELECT ticket_id, subject, category, priority, action,
-                              assignee, human_status, created_at
+                              assignee, human_status,lifecycle, created_at
                        FROM tickets ORDER BY created_at DESC""")
         return cur.fetchall()
 
@@ -119,3 +121,19 @@ def metrics() -> dict:
         by_category = cur.fetchall()
 
         return {**result, "by_category": by_category}
+
+def append_message(ticket_id : str, role: str,body: str) -> bool:
+    #push one turn onto state.messages and, when the customer writes, reopen the ticket
+    with _connect() as conn:
+        cur = conn.execute(
+            """ UPDATE tickets
+            SET state = jsonb_set(state, '{messages}', COALESCE(state-> 'messages','[]'::jsonb) || %s::jsonb), lifecycle = CASE WHEN %s = 'customer' THEN 'open' ELSE lifecycle END WHERE ticket_id=%s""",(Jsonb([{"role": role, "body": body}]),role, ticket_id),
+        )
+        return cur.rowcount>0
+
+def set_lifecycle(ticket_id: str, lifecycle:str) ->bool:
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE tickets SET lifecycle = %s WHERE ticket_id = %s",(lifecycle,ticket_id),
+        )
+        return cur.rowcount>0
