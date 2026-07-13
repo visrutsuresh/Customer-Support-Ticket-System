@@ -76,8 +76,8 @@ def _reprocess(ticket_id: str, latest: str):
             store.add_tag(ticket_id, tag)
 
 @app.get("/tickets")
-def list_tickets():
-    return store.list_all()
+def list_tickets(status: str | None = None, category: str |None = None, tag: str | None= None, q: str | None=None):
+    return store.list_all(status=status, category=category, tag= tag, q=q)
 
 @app.get("/tickets/{ticket_id}")
 def get_ticket(ticket_id: str):

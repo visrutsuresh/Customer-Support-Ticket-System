@@ -65,12 +65,27 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
             (ticket_id, subject, created_at, Jsonb(minimal)),
         )
 
-def list_all() -> list[dict]:
+def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
+    clauses,params = [],[]
+    if status:
+        clauses.append("human_status =%s")
+        params.append(status)
+    if category:
+        clauses.append("LOWER(category)=LOWER(%s)")
+        params.append(category)
+    if tag:
+        clauses.append("tags @> %s::jsonb")
+        params.append(Jsonb([tag]))
+    if q:
+        clauses.append("(subject ILIKE %s OR state -> 'ticket' ->>'body' ILIKE %s)")
+        params.extend([f"%{q}%", f"%{q}%"])
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("""SELECT ticket_id, subject, category, priority, action,
+        cur.execute(f"""SELECT ticket_id, subject, category, priority, action,
                               assignee, human_status,lifecycle, tags, created_at
-                       FROM tickets ORDER BY created_at DESC""")
+                       FROM tickets {where} ORDER BY created_at DESC""", params)
         return cur.fetchall()
 
 def get(ticket_id: str) -> dict | None:
