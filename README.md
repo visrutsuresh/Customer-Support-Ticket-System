@@ -61,6 +61,9 @@ docker compose up -d
 # 3. Seed the knowledge base (creates + fills the Weaviate "Knowledge" collection)
 uv run python seed_kb.py
 
+# 3b. Import the larger article + past-ticket corpus (reads data/kb_seed.jsonl, works offline)
+uv run python kb_import.py
+
 # 4. Frontend deps
 cd frontend
 npm install
@@ -85,6 +88,24 @@ npm run dev                              # UI on http://localhost:3000
 
 Then open **http://localhost:3000**. Submit a ticket at `/new`, watch it appear in the queue,
 click it to review, and approve / reject / edit the AI's draft.
+
+### Behind a TLS-intercepting proxy (mitmproxy / corporate CA / etc.)
+
+If your machine sets an `HTTPS_PROXY`, it will hijack the local Weaviate gRPC calls (port 50051) and
+time them out, so ticket processing and the seed scripts fail. Keep the proxy for external calls but
+exclude localhost. Set these before the backend **and** before `seed_kb.py` / `kb_import.py`:
+
+PowerShell:
+```powershell
+$env:NO_PROXY="127.0.0.1,localhost"; $env:no_grpc_proxy="127.0.0.1,localhost"
+uv run uvicorn api:app --reload
+```
+
+bash:
+```bash
+export NO_PROXY=127.0.0.1,localhost no_grpc_proxy=127.0.0.1,localhost
+uv run uvicorn api:app --reload
+```
 
 ### Command-line demo (no UI, no DB writes needed for the pipeline itself)
 ```bash
@@ -118,15 +139,23 @@ uv run python demo.py                    # runs the pipeline over 7 sample ticke
 ## Common gotchas
 
 - **`role "support" does not exist` on startup.** A stale Postgres data volume, or another Postgres already
-  on port 5432. Fix: stop the other Postgres (macOS: `brew services stop postgresql@16`), or wipe the volume
-  and re-init: `docker compose down -v && docker compose up -d` (note: `-v` also wipes Weaviate, so re-run
-  `seed_kb.py` after).
+  on port 5432, or (most common) the password in `DATABASE_URL` does not match `POSTGRES_PASSWORD` in
+  `docker-compose.yml`. Postgres only applies those credentials on a first-time init against an empty data
+  volume, so if they drift, wiping alone will not help until the two agree. Fix: make `DATABASE_URL` match
+  the compose credentials; then, only if the volume was initialized with the old password, remove just the
+  Postgres volume by name and re-init (so the Weaviate KB volume survives):
+  `docker compose down && docker volume rm <project>_pgdata && docker compose up -d`. If another Postgres
+  is on 5432 (macOS Homebrew), stop it first: `brew services stop postgresql@16`.
 - **"malformed intake" / ticket not saved.** `source` must be one of `chat`, `form`, `email`, `voice_transcript`.
   Any other value is rejected by design.
 - **Submitting a ticket feels slow / frozen.** Creating a ticket runs the full LLM pipeline (several seconds).
   That is expected; don't double-submit.
 - **App won't start, `KeyError` on a lane URL.** A required `*_LANE_URL` / `*_LANE_TOKEN` is missing from `.env`.
-- **Empty retrieval / no KB matches.** Run `uv run python seed_kb.py` (the collection is empty after a `down -v`).
+- **Empty retrieval / no KB matches.** Run `uv run python seed_kb.py` then `uv run python kb_import.py`
+  (the collection is empty after a volume wipe).
+- **Weaviate gRPC times out / seeding or processing hangs then fails.** An `HTTPS_PROXY` on your machine is
+  routing localhost gRPC through the proxy. Exclude localhost with `NO_PROXY` / `no_grpc_proxy` as shown in
+  "Behind a TLS-intercepting proxy" above.
 
 ---
 

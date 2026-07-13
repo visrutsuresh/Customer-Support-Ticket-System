@@ -15,9 +15,15 @@ from app.embed import embed
 N_ARTICLES, N_TICKETS = 250, 150
 SEED_FILE = "data/kb_seed.jsonl"
 
+_PROFANITY = re.compile(
+    r"\b(motherf\w*|fuck\w*|bastard\w*|bitch\w*|asshole\w*)\b",
+    re.I,
+)
+
 def clean(text: str) -> str:
     # drop Bitext's {{Order Number}} style tokens and squeeze the whitespace
     text = re.sub(r"\{\{([^}]+)\}\}", lambda m: m.group(1).lower(), text)
+    text = _PROFANITY.sub("", text)  # keep the anger, drop the swearing
     return " ".join(text.split())
 
 def map_category(cat: str) -> str:
