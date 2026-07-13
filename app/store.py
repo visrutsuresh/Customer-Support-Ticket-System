@@ -24,10 +24,12 @@ def init_db():
                 human_status TEXT,
                 lifecycle TEXT DEFAULT 'open',
                 created_at TIMESTAMPTZ,
+                tags JSONB DEFAULT '[]',
                 state JSONB
             )
         """)
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS lifecycle TEXT DEFAULT 'open'")
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'")
 
 def save(state: dict) -> None:
     t = state["ticket"]
@@ -67,20 +69,21 @@ def list_all() -> list[dict]:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute("""SELECT ticket_id, subject, category, priority, action,
-                              assignee, human_status,lifecycle, created_at
+                              assignee, human_status,lifecycle, tags, created_at
                        FROM tickets ORDER BY created_at DESC""")
         return cur.fetchall()
 
 def get(ticket_id: str) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT state, human_status, lifecycle FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        cur.execute("SELECT state, human_status, lifecycle, tags FROM tickets WHERE ticket_id = %s", (ticket_id,))
         row = cur.fetchone()
     if row is None:
         return None
     state = row["state"]
     state["human_status"] = row["human_status"]
     state["lifecycle"] = row["lifecycle"]
+    state["tags"] = row["tags"]
     return state
 
 def set_status(ticket_id: str, status: str) -> bool:
@@ -142,3 +145,19 @@ def set_lifecycle(ticket_id: str, lifecycle:str) ->bool:
             "UPDATE tickets SET lifecycle = %s WHERE ticket_id = %s",(lifecycle,ticket_id),
         )
         return cur.rowcount>0
+
+def add_tag(ticket_id: str, tag:str) -> bool:
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE tickets SET tags = tags || %s::jsonb WHERE ticket_id = %s AND NOT tags @> %s::jsonb",
+            (Jsonb([tag]),ticket_id, Jsonb([tag])),
+        )
+        return cur.rowcount>0
+def remove_tag(ticket_id: str, tag:str) -> bool:
+    with _connect() as conn:
+        cur = conn.execute("""
+        UPDATE tickets SET tags = COALESCE(
+            (SELECT jsonb_agg(t) FROM jsonb_array_elements(tags) t WHERE t <> %s::jsonb),'[]'::jsonb)
+            WHERE ticket_id = %s""",(Jsonb(tag),ticket_id),
+            )
+    return cur.rowcount>0

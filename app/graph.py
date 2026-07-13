@@ -72,6 +72,20 @@ def classify(state:State) -> dict:
     #print("classify ran")
     return {"classification": data, "audit":["classify done"]}
 
+def auto_tags(c:dict) -> list[str]:
+    tags=[]
+    category = (c.get("category") or "").lower()
+    priority = (c.get("priority") or "").lower()
+    sentiment = (c.get("sentiment") or "").lower()
+
+    if category:
+        tags.append(category)
+    if priority in {"critical", "high"}:
+        tags.append(priority)
+    if sentiment == "negative":
+        tags.append("unhappy")
+    return tags 
+
 def score_difficulty(state: State) -> dict:
     t = state["ticket"]
     prompt = f"""Rate how hard this support ticket is to resolve well.
