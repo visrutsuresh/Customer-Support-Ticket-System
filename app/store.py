@@ -30,12 +30,14 @@ def init_db():
                 created_at TIMESTAMPTZ,
                 due_at TIMESTAMPTZ,
                 tags JSONB DEFAULT '[]',
-                state JSONB
+                state JSONB,
+                csat INT
             )
         """)
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS lifecycle TEXT DEFAULT 'open'")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ")
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS csat INT")
 
 def save(state: dict) -> None:
     t = state["ticket"]
@@ -102,7 +104,7 @@ def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
 def get(ticket_id: str) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT state, human_status, lifecycle, tags,due_at,(due_at IS NOT NULL AND due_at < now() AND lifecycle <> 'resolved') AS sla_breached FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        cur.execute("SELECT state, human_status, lifecycle, tags,due_at,(due_at IS NOT NULL AND due_at < now() AND lifecycle <> 'resolved') AS sla_breached,csat FROM tickets WHERE ticket_id = %s", (ticket_id,))
         row = cur.fetchone()
     if row is None:
         return None
@@ -112,6 +114,7 @@ def get(ticket_id: str) -> dict | None:
     state["tags"] = row["tags"]
     state["due_at"] = row["due_at"]
     state["sla_breached"] = row["sla_breached"]
+    state["csat"] = row["csat"]
     return state
 
 def set_status(ticket_id: str, status: str) -> bool:
@@ -142,7 +145,9 @@ def metrics() -> dict:
         SELECT
          COUNT(*)    AS total,
          COUNT(*) FILTER (WHERE action = 'escalate') AS escalated,
-         COUNT(*) FILTER (WHERE action = 'auto_send') AS auto_resolved
+         COUNT(*) FILTER (WHERE action = 'auto_send') AS auto_resolved,
+         AVG(csat)::float AS avg_csat,
+         COUNT(csat) AS csat_count
         FROM tickets
         """)
         result = cur.fetchone()
@@ -189,3 +194,10 @@ def remove_tag(ticket_id: str, tag:str) -> bool:
             WHERE ticket_id = %s""",(Jsonb(tag),ticket_id),
             )
     return cur.rowcount>0
+
+def set_csat(ticket_id: str, score: int) -> bool:
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE tickets SET csat = %s WHERE ticket_id = %s", (score,ticket_id),
+        )
+        return cur.rowcount > 0
