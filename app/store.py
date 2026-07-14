@@ -1,39 +1,58 @@
 import os
-import psycopg #type:ignore
+from datetime import timedelta
+
+import psycopg  # type:ignore
 from dotenv import load_dotenv
 from fastapi.encoders import jsonable_encoder
-from psycopg.types.json import Jsonb #type:ignore
-from psycopg.rows import dict_row #type:ignore
-from datetime import timedelta
+from psycopg.rows import dict_row  # type:ignore
+from psycopg.types.json import Jsonb  # type:ignore
 
 load_dotenv()
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-#minutes from ticket arrival to the resolution deadline, by priority
+# minutes from ticket arrival to the resolution deadline, by priority
 SLA_RESOLUTION_MINUTES = {"critical": 60, "high": 120, "medium": 180, "low": 240}
 
-#templates: (name, category, keywords, auto_use, body). auto_use OFF by default = manual only (8b auto-send opt-in).
-DEFAULT_TEMPLATES=[
-    ('ask_order_number',"refund",["order number", "order id","refund"], False,
-    "Hi there, thanks for reaching out. So we can look into this, could you reply with your order number? Once we have it we will get this sorted right away.\n\nThe Support Team"),
-    ("password_reset","account",["password","reset password", "can't log in","cannot log in", "sign in"], True,
-    "Hi there, sorry for the trouble signing in. Please use the 'Forgot password' link on the login page to set a new one. That reset link is valid for 30 minutes, so use it soon after requesting it.\n\nThe Support Team"),
-    ("shipping_delay","shipping",["where is my order", "shipping", "tracking","delivery","not arrived"], True,
-    "Hi there, thanks for your patience. Your order is on its way but running a little behind. You can follow it with the tracking link in your shipping confirmation email. Let us know if it has not arrived in the next few days.\n\nThe Support Team"),
+# templates: (name, category, keywords, auto_use, body). auto_use OFF by default = manual only (8b auto-send opt-in).
+DEFAULT_TEMPLATES = [
+    (
+        "ask_order_number",
+        "refund",
+        ["order number", "order id", "refund"],
+        False,
+        "Hi there, thanks for reaching out. So we can look into this, could you reply with your order number? Once we have it we will get this sorted right away.\n\nThe Support Team",
+    ),
+    (
+        "password_reset",
+        "account",
+        ["password", "reset password", "can't log in", "cannot log in", "sign in"],
+        True,
+        "Hi there, sorry for the trouble signing in. Please use the 'Forgot password' link on the login page to set a new one. That reset link is valid for 30 minutes, so use it soon after requesting it.\n\nThe Support Team",
+    ),
+    (
+        "shipping_delay",
+        "shipping",
+        ["where is my order", "shipping", "tracking", "delivery", "not arrived"],
+        True,
+        "Hi there, thanks for your patience. Your order is on its way but running a little behind. You can follow it with the tracking link in your shipping confirmation email. Let us know if it has not arrived in the next few days.\n\nThe Support Team",
+    ),
 ]
+
 
 def _connect():
     return psycopg.connect(DATABASE_URL)
 
+
 def _seed_templates(conn):
-    #only fills the shelf if it is empty, so restarts never pile up duplicates
+    # only fills the shelf if it is empty, so restarts never pile up duplicates
     n = conn.execute("SELECT COUNT(*) FROM templates").fetchone()[0]
-    if n==0:
-        for name,category,keywords,auto_use,body in DEFAULT_TEMPLATES:
+    if n == 0:
+        for name, category, keywords, auto_use, body in DEFAULT_TEMPLATES:
             conn.execute(
                 "INSERT INTO templates (name,category,keywords,auto_use,body) VALUES (%s,%s,%s,%s,%s)",
-                (name,category,Jsonb(keywords),auto_use,body),
+                (name, category, Jsonb(keywords), auto_use, body),
             )
+
 
 def init_db():
     with _connect() as conn:
@@ -78,7 +97,21 @@ def init_db():
             auto_use BOOLEAN DEFAULT false
             )
         """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS attachments(
+            id SERIAL PRIMARY KEY,
+            ticket_id TEXT,
+            filename TEXT,
+            content_type TEXT,
+            size INT,
+            data BYTEA,
+            created_at TIMESTAMPTZ DEFAULT now()
+        )
+        """)
+
         _seed_templates(conn)
+
 
 def save(state: dict) -> None:
     t = state["ticket"]
@@ -87,7 +120,7 @@ def save(state: dict) -> None:
     assignee = (d.get("assignee") or {}).get("name")
 
     priority = (c.get("priority") or "medium").lower()
-    minutes = SLA_RESOLUTION_MINUTES.get(priority,SLA_RESOLUTION_MINUTES["medium"])
+    minutes = SLA_RESOLUTION_MINUTES.get(priority, SLA_RESOLUTION_MINUTES["medium"])
     due_at = t.created_at + timedelta(minutes=minutes)
 
     with _connect() as conn:
@@ -99,17 +132,28 @@ def save(state: dict) -> None:
                  subject=EXCLUDED.subject, category=EXCLUDED.category, priority=EXCLUDED.priority,
                  action=EXCLUDED.action, assignee=EXCLUDED.assignee,
                  human_status=EXCLUDED.human_status, created_at=EXCLUDED.created_at,due_at=EXCLUDED.due_at, state=EXCLUDED.state""",
-            (t.ticket_id, t.subject, c.get("category"), c.get("priority"),
-             d.get("action"), assignee, "pending", t.created_at,due_at,
-             Jsonb(jsonable_encoder(state))),
+            (
+                t.ticket_id,
+                t.subject,
+                c.get("category"),
+                c.get("priority"),
+                d.get("action"),
+                assignee,
+                "pending",
+                t.created_at,
+                due_at,
+                Jsonb(jsonable_encoder(state)),
+            ),
         )
+
 
 def save_pending(ticket_id, subject, body, source, name, email, created_at) -> None:
     # store a ticket as "processing" BEFORE the pipeline runs, so the customer's submit is instant
     minimal = {
-        "ticket": {"subject": subject, "body": body, "source": source,
-                   "customer_name": name, "customer_email": email},
-        "classification": {}, "decision": {}, "draft": {},
+        "ticket": {"subject": subject, "body": body, "source": source, "customer_name": name, "customer_email": email},
+        "classification": {},
+        "decision": {},
+        "draft": {},
     }
     with _connect() as conn:
         conn.execute(
@@ -119,8 +163,9 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
             (ticket_id, subject, created_at, Jsonb(minimal)),
         )
 
-def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
-    clauses,params = ["merged_into IS NULL"],[]
+
+def list_all(status=None, category=None, tag=None, q=None) -> list[dict]:
+    clauses, params = ["merged_into IS NULL"], []
     if status:
         clauses.append("human_status =%s")
         params.append(status)
@@ -133,19 +178,26 @@ def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
     if q:
         clauses.append("(subject ILIKE %s OR state -> 'ticket' ->>'body' ILIKE %s)")
         params.extend([f"%{q}%", f"%{q}%"])
-    where = (" WHERE " + " AND ".join(clauses))
+    where = " WHERE " + " AND ".join(clauses)
 
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute(f"""SELECT ticket_id, subject, category, priority, action,
+        cur.execute(
+            f"""SELECT ticket_id, subject, category, priority, action,
                               assignee, human_status,lifecycle, tags, created_at, due_at, (due_at IS NOT NULL AND due_at <now() AND lifecycle <> 'resolved') AS sla_breached
-                       FROM tickets {where} ORDER BY created_at DESC""", params)
+                       FROM tickets {where} ORDER BY created_at DESC""",
+            params,
+        )
         return cur.fetchall()
+
 
 def get(ticket_id: str) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT state, human_status, lifecycle, tags,due_at,(due_at IS NOT NULL AND due_at < now() AND lifecycle <> 'resolved') AS sla_breached,csat, merged_into FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        cur.execute(
+            "SELECT state, human_status, lifecycle, tags,due_at,(due_at IS NOT NULL AND due_at < now() AND lifecycle <> 'resolved') AS sla_breached,csat, merged_into FROM tickets WHERE ticket_id = %s",
+            (ticket_id,),
+        )
         row = cur.fetchone()
         if row is None:
             return None
@@ -164,14 +216,13 @@ def get(ticket_id: str) -> dict | None:
         state["merged_from"] = [r["ticket_id"] for r in cur.fetchall()]
     return state
 
+
 def set_status(ticket_id: str, status: str) -> bool:
     # human reviewer verdict: approved / rejected
     with _connect() as conn:
-        cur = conn.execute(
-            "UPDATE tickets SET human_status = %s WHERE ticket_id = %s",
-            (status, ticket_id),
-        )
+        cur = conn.execute("UPDATE tickets SET human_status = %s WHERE ticket_id = %s", (status, ticket_id))
         return cur.rowcount > 0
+
 
 def edit_reply(ticket_id: str, new_reply: str) -> bool:
     # reviewer rewrites the draft: patch draft.reply inside the jsonb state, mark edited
@@ -185,9 +236,10 @@ def edit_reply(ticket_id: str, new_reply: str) -> bool:
         )
         return cur.rowcount > 0
 
+
 def metrics() -> dict:
     with _connect() as conn:
-        cur= conn.cursor(row_factory=dict_row)
+        cur = conn.cursor(row_factory=dict_row)
         cur.execute("""
         SELECT
          COUNT(*)    AS total,
@@ -210,44 +262,50 @@ def metrics() -> dict:
 
         return {**result, "by_category": by_category}
 
-def append_message(ticket_id : str, role: str,body: str) -> bool:
-    #push one turn onto state.messages and, when the customer writes, reopen the ticket
+
+def append_message(ticket_id: str, role: str, body: str) -> bool:
+    # push one turn onto state.messages and, when the customer writes, reopen the ticket
     with _connect() as conn:
         cur = conn.execute(
             """ UPDATE tickets
-            SET state = jsonb_set(state, '{messages}', COALESCE(state-> 'messages','[]'::jsonb) || %s::jsonb), lifecycle = CASE WHEN %s = 'customer' THEN 'open' ELSE lifecycle END WHERE ticket_id=%s""",(Jsonb([{"role": role, "body": body}]),role, ticket_id),
+            SET state = jsonb_set(state, '{messages}', COALESCE(state-> 'messages','[]'::jsonb) || %s::jsonb), lifecycle = CASE WHEN %s = 'customer' THEN 'open' ELSE lifecycle END WHERE ticket_id=%s""",
+            (Jsonb([{"role": role, "body": body}]), role, ticket_id),
         )
-        return cur.rowcount>0
+        return cur.rowcount > 0
 
-def set_lifecycle(ticket_id: str, lifecycle:str) ->bool:
+
+def set_lifecycle(ticket_id: str, lifecycle: str) -> bool:
     with _connect() as conn:
-        cur = conn.execute(
-            "UPDATE tickets SET lifecycle = %s WHERE ticket_id = %s",(lifecycle,ticket_id),
-        )
-        return cur.rowcount>0
+        cur = conn.execute("UPDATE tickets SET lifecycle = %s WHERE ticket_id = %s", (lifecycle, ticket_id))
+        return cur.rowcount > 0
 
-def add_tag(ticket_id: str, tag:str) -> bool:
+
+def add_tag(ticket_id: str, tag: str) -> bool:
     with _connect() as conn:
         cur = conn.execute(
             "UPDATE tickets SET tags = tags || %s::jsonb WHERE ticket_id = %s AND NOT tags @> %s::jsonb",
-            (Jsonb([tag]),ticket_id, Jsonb([tag])),
+            (Jsonb([tag]), ticket_id, Jsonb([tag])),
         )
-        return cur.rowcount>0
-def remove_tag(ticket_id: str, tag:str) -> bool:
+        return cur.rowcount > 0
+
+
+def remove_tag(ticket_id: str, tag: str) -> bool:
     with _connect() as conn:
-        cur = conn.execute("""
+        cur = conn.execute(
+            """
         UPDATE tickets SET tags = COALESCE(
             (SELECT jsonb_agg(t) FROM jsonb_array_elements(tags) t WHERE t <> %s::jsonb),'[]'::jsonb)
-            WHERE ticket_id = %s""",(Jsonb(tag),ticket_id),
-            )
-    return cur.rowcount>0
+            WHERE ticket_id = %s""",
+            (Jsonb(tag), ticket_id),
+        )
+    return cur.rowcount > 0
+
 
 def set_csat(ticket_id: str, score: int) -> bool:
     with _connect() as conn:
-        cur = conn.execute(
-            "UPDATE tickets SET csat = %s WHERE ticket_id = %s", (score,ticket_id),
-        )
+        cur = conn.execute("UPDATE tickets SET csat = %s WHERE ticket_id = %s", (score, ticket_id))
         return cur.rowcount > 0
+
 
 def list_templates() -> list[dict]:
     with _connect() as conn:
@@ -255,11 +313,13 @@ def list_templates() -> list[dict]:
         cur.execute("SELECT id, name, body, category, keywords, auto_use FROM templates ORDER BY name")
         return cur.fetchall()
 
+
 def get_template(template_id: int) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute("SELECT id, name, body, category, keywords, auto_use FROM templates WHERE id = %s", (template_id,))
         return cur.fetchone()
+
 
 def create_template(name: str, body: str, category: str | None, keywords: list, auto_use: bool) -> dict:
     with _connect() as conn:
@@ -271,7 +331,10 @@ def create_template(name: str, body: str, category: str | None, keywords: list, 
         )
         return cur.fetchone()
 
-def update_template(template_id: int, name: str, body: str, category: str | None, keywords: list, auto_use: bool) -> dict | None:
+
+def update_template(
+    template_id: int, name: str, body: str, category: str | None, keywords: list, auto_use: bool
+) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
@@ -281,41 +344,85 @@ def update_template(template_id: int, name: str, body: str, category: str | None
         )
         return cur.fetchone()
 
+
 def delete_template(template_id: int) -> bool:
     with _connect() as conn:
         cur = conn.execute("DELETE FROM templates WHERE id = %s", (template_id,))
         return cur.rowcount > 0
 
+
 def merge_tickets(duplicate_id: str, primary_id: str) -> bool:
-    #fold the duplicate into the primary and move its messages over, close it, point it home
+    # fold the duplicate into the primary and move its messages over, close it, point it home
     if duplicate_id == primary_id:
         return False
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT ticket_id, merged_into FROM tickets WHERE ticket_id IN (%s, %s)",(duplicate_id,primary_id))
+        cur.execute(
+            "SELECT ticket_id, merged_into FROM tickets WHERE ticket_id IN (%s, %s)", (duplicate_id, primary_id)
+        )
         found = {r["ticket_id"]: r for r in cur.fetchall()}
         if duplicate_id not in found or primary_id not in found:
             return False
         if found[duplicate_id]["merged_into"] is not None:
-            return False #already merged once, do not merge again
-        conn.execute("""
+            return False  # already merged once, do not merge again
+        conn.execute(
+            """
             UPDATE tickets p
             SET state = jsonb_set(p.state, '{messages}',
                 COALESCE(p.state -> 'messages', '[]'::jsonb) || COALESCE(d.state -> 'messages', '[]'::jsonb))
             FROM tickets d
             WHERE p.ticket_id = %s AND d.ticket_id = %s
-        """, (primary_id,duplicate_id))
-        conn.execute("UPDATE tickets SET lifecycle = 'resolved', merged_into = %s WHERE ticket_id = %s", (primary_id, duplicate_id))
+        """,
+            (primary_id, duplicate_id),
+        )
+        conn.execute(
+            "UPDATE tickets SET lifecycle = 'resolved', merged_into = %s WHERE ticket_id = %s",
+            (primary_id, duplicate_id),
+        )
     return True
 
-def link_tickets(a:str, b:str) -> bool:
-    #relate two tickets without merging (symmetric, one card per pair)
-    if a==b:
+
+def link_tickets(a: str, b: str) -> bool:
+    # relate two tickets without merging (symmetric, one card per pair)
+    if a == b:
         return False
-    lo,hi = sorted([a,b])
+    lo, hi = sorted([a, b])
     with _connect() as conn:
-        cur = conn.execute("SELECT ticket_id FROM tickets WHERE ticket_id IN (%s,%s)", (a,b))
-        if len(cur.fetchall()) !=2:
+        cur = conn.execute("SELECT ticket_id FROM tickets WHERE ticket_id IN (%s,%s)", (a, b))
+        if len(cur.fetchall()) != 2:
             return False
-        conn.execute("INSERT INTO ticket_links (a,b) VALUES (%s, %s) ON CONFLICT DO NOTHING", (lo,hi))
+        conn.execute("INSERT INTO ticket_links (a,b) VALUES (%s, %s) ON CONFLICT DO NOTHING", (lo, hi))
     return True
+
+
+def add_attachment(ticket_id: str, filename: str, content_type: str, data: bytes) -> dict:
+    # store the raw bytes; return metadata only (never ship the blob back on upload)
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            "INSERT INTO attachments (ticket_id, filename, content_type, size, data) "
+            "VALUES (%s, %s, %s, %s, %s) "
+            "RETURNING id, ticket_id, filename, content_type, size, created_at",
+            (ticket_id, filename, content_type, len(data), data),
+        )
+        return cur.fetchone()
+
+
+def list_attachments(ticket_id: str) -> list[dict]:
+    # metadata only, no bytes, so the list stays light
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            "SELECT id, filename, content_type, size, created_at FROM attachments "
+            "WHERE ticket_id = %s ORDER BY created_at",
+            (ticket_id,),
+        )
+        return cur.fetchall()
+
+
+def get_attachment(attachment_id: int) -> dict | None:
+    # this one DOES pull the bytes, for the download endpoint
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute("SELECT filename, content_type, data FROM attachments WHERE id = %s", (attachment_id,))
+        return cur.fetchone()
