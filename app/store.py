@@ -58,6 +58,15 @@ def init_db():
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS csat INT")
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS merged_into TEXT")
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS ticket_links(
+            a TEXT,
+            b TEXT,
+            PRIMARY KEY (a,b)
+        )
+        """)
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS templates(
@@ -111,7 +120,7 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
         )
 
 def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
-    clauses,params = [],[]
+    clauses,params = ["merged_into IS NULL"],[]
     if status:
         clauses.append("human_status =%s")
         params.append(status)
@@ -124,7 +133,7 @@ def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
     if q:
         clauses.append("(subject ILIKE %s OR state -> 'ticket' ->>'body' ILIKE %s)")
         params.extend([f"%{q}%", f"%{q}%"])
-    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+    where = (" WHERE " + " AND ".join(clauses))
 
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
@@ -136,17 +145,23 @@ def list_all(status=None, category=None,tag=None,q=None) -> list[dict]:
 def get(ticket_id: str) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("SELECT state, human_status, lifecycle, tags,due_at,(due_at IS NOT NULL AND due_at < now() AND lifecycle <> 'resolved') AS sla_breached,csat FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        cur.execute("SELECT state, human_status, lifecycle, tags,due_at,(due_at IS NOT NULL AND due_at < now() AND lifecycle <> 'resolved') AS sla_breached,csat, merged_into FROM tickets WHERE ticket_id = %s", (ticket_id,))
         row = cur.fetchone()
-    if row is None:
-        return None
-    state = row["state"]
-    state["human_status"] = row["human_status"]
-    state["lifecycle"] = row["lifecycle"]
-    state["tags"] = row["tags"]
-    state["due_at"] = row["due_at"]
-    state["sla_breached"] = row["sla_breached"]
-    state["csat"] = row["csat"]
+        if row is None:
+            return None
+        state = row["state"]
+        state["human_status"] = row["human_status"]
+        state["lifecycle"] = row["lifecycle"]
+        state["tags"] = row["tags"]
+        state["due_at"] = row["due_at"]
+        state["sla_breached"] = row["sla_breached"]
+        state["csat"] = row["csat"]
+        state["merged_into"] = row["merged_into"]
+
+        cur.execute("SELECT a, b FROM ticket_links WHERE a = %s OR b = %s", (ticket_id, ticket_id))
+        state["related"] = [r["b"] if r["a"] == ticket_id else r["a"] for r in cur.fetchall()]
+        cur.execute("SELECT ticket_id FROM tickets WHERE merged_into = %s", (ticket_id,))
+        state["merged_from"] = [r["ticket_id"] for r in cur.fetchall()]
     return state
 
 def set_status(ticket_id: str, status: str) -> bool:
@@ -270,3 +285,37 @@ def delete_template(template_id: int) -> bool:
     with _connect() as conn:
         cur = conn.execute("DELETE FROM templates WHERE id = %s", (template_id,))
         return cur.rowcount > 0
+
+def merge_tickets(duplicate_id: str, primary_id: str) -> bool:
+    #fold the duplicate into the primary and move its messages over, close it, point it home
+    if duplicate_id == primary_id:
+        return False
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute("SELECT ticket_id, merged_into FROM tickets WHERE ticket_id IN (%s, %s)",(duplicate_id,primary_id))
+        found = {r["ticket_id"]: r for r in cur.fetchall()}
+        if duplicate_id not in found or primary_id not in found:
+            return False
+        if found[duplicate_id]["merged_into"] is not None:
+            return False #already merged once, do not merge again
+        conn.execute("""
+            UPDATE tickets p
+            SET state = jsonb_set(p.state, '{messages}',
+                COALESCE(p.state -> 'messages', '[]'::jsonb) || COALESCE(d.state -> 'messages', '[]'::jsonb))
+            FROM tickets d
+            WHERE p.ticket_id = %s AND d.ticket_id = %s
+        """, (primary_id,duplicate_id))
+        conn.execute("UPDATE tickets SET lifecycle = 'resolved', merged_into = %s WHERE ticket_id = %s", (primary_id, duplicate_id))
+    return True
+
+def link_tickets(a:str, b:str) -> bool:
+    #relate two tickets without merging (symmetric, one card per pair)
+    if a==b:
+        return False
+    lo,hi = sorted([a,b])
+    with _connect() as conn:
+        cur = conn.execute("SELECT ticket_id FROM tickets WHERE ticket_id IN (%s,%s)", (a,b))
+        if len(cur.fetchall()) !=2:
+            return False
+        conn.execute("INSERT INTO ticket_links (a,b) VALUES (%s, %s) ON CONFLICT DO NOTHING", (lo,hi))
+    return True

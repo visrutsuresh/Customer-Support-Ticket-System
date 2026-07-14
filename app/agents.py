@@ -47,7 +47,7 @@ def classify_agent(ticket) -> dict:
             return move["result"]
         
         #else it's a tool call: run it, feed the result back into the loop
-        obs = tools.run_tool(move.get("action"), move.get(f"args",{}))
+        obs = tools.run_tool(move.get("action"), move.get("args",{}))
         transcript += f"\nYou called {move.get('action')} ({move.get('args',{})}) -> {obs}"
     
     #fallback: it never finished in MAX_STEPS return a safe default

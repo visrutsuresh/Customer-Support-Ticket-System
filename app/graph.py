@@ -4,7 +4,7 @@ from app.intake import normalize
 import json
 import re
 from app import router
-from app.kb import search, index_resolved
+from app.kb import search
 import warnings
 from app.pii import scan
 from app.roster import assign

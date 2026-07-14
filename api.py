@@ -235,3 +235,23 @@ def apply_template(ticket_id: str, payload: ApplyTemplateIn):
         raise HTTPException(status_code=404, detail="template not found")
     store.edit_reply(ticket_id, tpl["body"])   # overwrite the draft with the template; marks the ticket 'edited'
     return {"ticket_id": ticket_id, "applied_template": tpl["name"], "reply": tpl["body"]}
+
+class MergeIn(BaseModel):
+    duplicate_id:str #this folds INTO the ticket in the path
+
+@app.post("/tickets/{ticket_id}/merge")
+def merge_ticket(ticket_id: str, payload: MergeIn):
+    if not store.merge_tickets(payload.duplicate_id, ticket_id):
+        raise HTTPException(status_code=400,
+                            detail="merge failed: both ids must exist, differ, and the duplicate must not already be merged")
+    return {"primary": ticket_id, "merged": payload.duplicate_id}
+
+class LinkIn(BaseModel):
+    other_id: str
+
+@app.post("/tickets/{ticket_id}/link")
+def link_ticket(ticket_id: str, payload: LinkIn):
+    if not store.link_tickets(ticket_id, payload.other_id):
+        raise HTTPException(status_code=400,
+                            detail="link failed: both ids must exist and differ")
+    return {"linked": sorted([ticket_id, payload.other_id])}
