@@ -10,7 +10,6 @@ from app import store
 from app.router import MODEL_TIER
 from app.agents import learn_agent
 from app.state import Ticket, public_messages
-from app.intake import normalize
 
 store.init_db()  # make sure the tickets table exists when the API boots
 
@@ -47,34 +46,7 @@ def create_ticket(payload: TicketIn, background: BackgroundTasks):
     background.add_task(_process, ticket_id, payload.model_dump())
     return {"ticket_id": ticket_id, "status": "processing"}
 
-def _deflect_with_template(ticket_id: str, raw: dict) -> bool:
-    # 8b: if an auto_use template keyword hits the very first message, answer with the template
-    # directly. no LLM pipeline, no human review, auto-sent. FIRST CONTACT ONLY (a later customer
-    # reply goes through _reprocess = the full AI + human path, which is the safety backstop).
-    tpl = store.match_auto_template(f"{raw.get('subject','')} {raw.get('body','')}")
-    if tpl is None:
-        return False
-    ticket = normalize({**raw, "ticket_id": ticket_id})
-    final = {
-        "ticket": ticket,
-        "classification": {"category": tpl["category"], "priority": "low",
-                           "business_impact": "low", "sentiment": "neutral"},
-        "decision": {"action": "auto_send", "reason": f"template deflection: {tpl['name']}"},
-        "draft": {"reply": tpl["body"], "kind": "answer", "source": "template"},
-        "messages": [{"role": "customer", "body": raw["body"]}],
-        "audit": [],
-    }
-    store.save(final)
-    store.set_status(ticket_id, "approved")                 # sent, not awaiting a reviewer
-    for tag in auto_tags(final["classification"]):
-        store.add_tag(ticket_id, tag)
-    store.append_message(ticket_id, "agent", tpl["body"])   # reply joins the thread = sent
-    store.set_lifecycle(ticket_id, "awaiting_customer")     # ball back to the customer
-    return True
-
 def _process(ticket_id: str, raw: dict):
-    if _deflect_with_template(ticket_id, raw):    # 8b: template auto-sent, skip the whole pipeline
-        return
     final = active_graph.invoke(
         {"raw_input": {**raw, "ticket_id": ticket_id},"messages":[{"role": "customer", "body": raw["body"]}], "audit": []},
         {"recursion_limit": 40},

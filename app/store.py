@@ -270,14 +270,3 @@ def delete_template(template_id: int) -> bool:
     with _connect() as conn:
         cur = conn.execute("DELETE FROM templates WHERE id = %s", (template_id,))
         return cur.rowcount > 0
-
-def match_auto_template(text: str) -> dict | None:
-    #8b: the first auto_use template whose keyword appears in the ticket text.
-    #plain case-insensitive substring match. returns the template dict, or None if nothing hits.
-    text_low = (text or "").lower()
-    for tpl in list_templates():                 # ORDER BY name = a deterministic pick
-        if not tpl["auto_use"]:
-            continue
-        if any(kw.lower() in text_low for kw in (tpl["keywords"] or [])):
-            return tpl
-    return None
