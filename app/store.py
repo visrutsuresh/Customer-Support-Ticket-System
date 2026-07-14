@@ -12,8 +12,28 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 #minutes from ticket arrival to the resolution deadline, by priority
 SLA_RESOLUTION_MINUTES = {"critical": 60, "high": 120, "medium": 180, "low": 240}
 
+#templates: (name, category, keywords, auto_use, body). auto_use OFF by default = manual only (8b auto-send opt-in).
+DEFAULT_TEMPLATES=[
+    ('ask_order_number',"refund",["order number", "order id","refund"], False,
+    "Hi there, thanks for reaching out. So we can look into this, could you reply with your order number? Once we have it we will get this sorted right away.\n\nThe Support Team"),
+    ("password_reset","account",["password","reset password", "can't log in","cannot log in", "sign in"], True,
+    "Hi there, sorry for the trouble signing in. Please use the 'Forgot password' link on the login page to set a new one. That reset link is valid for 30 minutes, so use it soon after requesting it.\n\nThe Support Team"),
+    ("shipping_delay","shipping",["where is my order", "shipping", "tracking","delivery","not arrived"], True,
+    "Hi there, thanks for your patience. Your order is on its way but running a little behind. You can follow it with the tracking link in your shipping confirmation email. Let us know if it has not arrived in the next few days.\n\nThe Support Team"),
+]
+
 def _connect():
     return psycopg.connect(DATABASE_URL)
+
+def _seed_templates(conn):
+    #only fills the shelf if it is empty, so restarts never pile up duplicates
+    n = conn.execute("SELECT COUNT(*) FROM templates").fetchone()[0]
+    if n==0:
+        for name,category,keywords,auto_use,body in DEFAULT_TEMPLATES:
+            conn.execute(
+                "INSERT INTO templates (name,category,keywords,auto_use,body) VALUES (%s,%s,%s,%s,%s)",
+                (name,category,Jsonb(keywords),auto_use,body),
+            )
 
 def init_db():
     with _connect() as conn:
@@ -38,6 +58,18 @@ def init_db():
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS csat INT")
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS templates(
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            body TEXT,
+            category TEXT,
+            keywords JSONB DEFAULT '[]',
+            auto_use BOOLEAN DEFAULT false
+            )
+        """)
+        _seed_templates(conn)
 
 def save(state: dict) -> None:
     t = state["ticket"]
@@ -200,4 +232,41 @@ def set_csat(ticket_id: str, score: int) -> bool:
         cur = conn.execute(
             "UPDATE tickets SET csat = %s WHERE ticket_id = %s", (score,ticket_id),
         )
+        return cur.rowcount > 0
+
+def list_templates() -> list[dict]:
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute("SELECT id, name, body, category, keywords, auto_use FROM templates ORDER BY name")
+        return cur.fetchall()
+
+def get_template(template_id: int) -> dict | None:
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute("SELECT id, name, body, category, keywords, auto_use FROM templates WHERE id = %s", (template_id,))
+        return cur.fetchone()
+
+def create_template(name: str, body: str, category: str | None, keywords: list, auto_use: bool) -> dict:
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            "INSERT INTO templates (name, body, category, keywords, auto_use) VALUES (%s, %s, %s, %s, %s) "
+            "RETURNING id, name, body, category, keywords, auto_use",
+            (name, body, category, Jsonb(keywords or []), auto_use),
+        )
+        return cur.fetchone()
+
+def update_template(template_id: int, name: str, body: str, category: str | None, keywords: list, auto_use: bool) -> dict | None:
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            "UPDATE templates SET name = %s, body = %s, category = %s, keywords = %s, auto_use = %s WHERE id = %s "
+            "RETURNING id, name, body, category, keywords, auto_use",
+            (name, body, category, Jsonb(keywords or []), auto_use, template_id),
+        )
+        return cur.fetchone()
+
+def delete_template(template_id: int) -> bool:
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM templates WHERE id = %s", (template_id,))
         return cur.rowcount > 0

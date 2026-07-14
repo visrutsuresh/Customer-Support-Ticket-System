@@ -187,3 +187,51 @@ def customer_thread(ticket_id: str):
         raise HTTPException(status_code=404, detail="ticket not found")
     messages = public_messages(state.get("messages", []))
     return {"ticket_id": ticket_id, "messages": messages}
+
+class TemplateIn(BaseModel):
+    name: str
+    body: str
+    category: str | None = None
+    keywords: list[str] = []
+    auto_use: bool = False
+
+@app.get("/templates")
+def list_templates():
+    return store.list_templates()
+
+@app.post("/templates")
+def add_template(payload: TemplateIn):
+    return store.create_template(payload.name, payload.body, payload.category, payload.keywords, payload.auto_use)
+
+@app.get("/templates/{template_id}")
+def read_template(template_id: int):
+    tpl = store.get_template(template_id)
+    if tpl is None:
+        raise HTTPException(status_code=404, detail="template not found")
+    return tpl
+
+@app.put("/templates/{template_id}")
+def edit_template(template_id: int, payload: TemplateIn):
+    tpl = store.update_template(template_id, payload.name, payload.body, payload.category, payload.keywords, payload.auto_use)
+    if tpl is None:
+        raise HTTPException(status_code=404, detail="template not found")
+    return tpl
+
+@app.delete("/templates/{template_id}")
+def remove_template(template_id: int):
+    if not store.delete_template(template_id):
+        raise HTTPException(status_code=404, detail="template not found")
+    return {"template_id": template_id, "deleted": True}
+
+class ApplyTemplateIn(BaseModel):
+    template_id: int
+
+@app.post("/tickets/{ticket_id}/apply-template")
+def apply_template(ticket_id: str, payload: ApplyTemplateIn):
+    if store.get(ticket_id) is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    tpl = store.get_template(payload.template_id)
+    if tpl is None:
+        raise HTTPException(status_code=404, detail="template not found")
+    store.edit_reply(ticket_id, tpl["body"])   # overwrite the draft with the template; marks the ticket 'edited'
+    return {"ticket_id": ticket_id, "applied_template": tpl["name"], "reply": tpl["body"]}
