@@ -1,4 +1,4 @@
-from app.state import State
+from app.state import State, public_messages
 from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
 import json
@@ -187,7 +187,7 @@ def generate(state:State) -> dict:
     hits = state["retrieval"]
     kb_text = "\n\n".join(f"[{h['title']}]\n{h['content']}" for h in hits)
 
-    history = state.get("messages", [])
+    history = public_messages(state.get("messages", []))
     convo = "\n".join(
         f"{'Customer' if m['role'] == 'customer' else 'Support'}:{m['body']}" for m in history
     )

@@ -1,6 +1,7 @@
 import json 
 import re
 from app.pii import scan
+from app.state import public_messages
 from app import router, tools
 from app.kb import index_resolved
 
@@ -131,7 +132,7 @@ def _write_reply(ticket,articles,customer,notes,lane,tier,convo="") -> str:
 def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None) -> dict:
     convo = "\n".join(
         f"{'Customer' if m['role'] == 'customer' else 'Support'}: {m['body']}"
-        for m in (history or [])
+        for m in public_messages(history)
     )
     context = (f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n"
                 f"  subject: {ticket.subject}\n body: {ticket.body}\n"

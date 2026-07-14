@@ -9,7 +9,7 @@ from app.orchestrator import graph_auto
 from app import store
 from app.router import MODEL_TIER
 from app.agents import learn_agent
-from app.state import Ticket
+from app.state import Ticket, public_messages
 
 store.init_db()  # make sure the tickets table exists when the API boots
 
@@ -163,3 +163,21 @@ def remove_ticket_tag(ticket_id: str, tag: str):
         raise HTTPException(status_code=404, detail="ticket not found")
     store.remove_tag(ticket_id, tag)
     return {"ticket_id": ticket_id, "tag": tag, "removed": True}
+
+class NoteIn(BaseModel):
+    body: str
+
+@app.post("/tickets/{ticket_id}/note")
+def add_internal_note(ticket_id: str, payload: NoteIn):
+    if store.get(ticket_id) is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    store.append_message(ticket_id,"internal", payload.body) 
+    return {"ticket_id": ticket_id, "role": "internal", "added": True }
+
+@app.get("/tickets/{ticket_id}/thread")
+def customer_thread(ticket_id: str):
+    state = store.get(ticket_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    messages = public_messages(state.get("messages", []))
+    return {"ticket_id": ticket_id, "messages": messages}

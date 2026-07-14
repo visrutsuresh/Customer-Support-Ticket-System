@@ -29,5 +29,10 @@ class State(TypedDict):
     learned: bool #True if this resolved ticket was filed into the KB 
     sensitivity: dict #PII scan + category heuristic result, set before routing
     difficulty: dict #LLM difficulty score (simple vs complex)
-    messages: list #List of past messages in the conversation. oldest first.
+    messages: list #conversation turns, oldest first. role = customer | agent | internal
     lifecycle: str #state of the ticket -open, awaiting_customer, resolved
+
+def public_messages(messages: list) -> list:
+    #the customer-safe view of a thread: everything except private internal notes.
+    #single source of truth so no customer-facing reader (thread view, reply model) can forget the filter.
+    return [m for m in (messages or []) if m["role"] != "internal"]
