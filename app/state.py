@@ -36,3 +36,22 @@ def public_messages(messages: list) -> list:
     #the customer-safe view of a thread: everything except private internal notes.
     #single source of truth so no customer-facing reader (thread view, reply model) can forget the filter.
     return [m for m in (messages or []) if m["role"] != "internal"]
+
+# confidence policy (shared by both modes so they decide identically).
+# NOTE: this is a grounded HEURISTIC, not a calibrated probability. A calibrated
+# number needs a labelled batch + a fitted reliability curve (see TODO item 19/42).
+CONF_SENSITIVE = 90  # refund/billing need a high bar before we auto-send with no human
+CONF_NORMAL = 60     # everything else
+
+def grounded_confidence(agent_conf, retrieval) -> int:
+    #blend the agent's self-reported confidence with how strongly the KB actually matched.
+    #both have to be high for a high score: "I'm sure" AND "the KB backs me up".
+    top = max((h.get("score", 0) for h in (retrieval or [])), default=0)
+    if agent_conf is None:
+        return int(top)                       #no self-report -> lean on retrieval strength alone
+    return round((agent_conf + top) / 2)
+
+def confidence_threshold(category, priority=None) -> int:
+    #money categories AND high-priority tickets must clear a higher bar before auto-send
+    high_stakes = category in {"refund", "billing"} or priority == "high"
+    return CONF_SENSITIVE if high_stakes else CONF_NORMAL

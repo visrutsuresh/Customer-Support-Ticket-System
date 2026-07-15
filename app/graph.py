@@ -1,4 +1,4 @@
-from app.state import State, public_messages
+from app.state import State, public_messages, grounded_confidence, confidence_threshold
 from langgraph.graph import StateGraph, START, END
 from app.intake import normalize
 import json
@@ -215,7 +215,12 @@ def generate(state:State) -> dict:
 
     Knowledge base: {kb_text}
 
-    Begin your response with a single control line: "KIND: answer" if you are answering the question, or "KIND: question" if you are instead asking the customer for missing information. Put the actual reply on the lines after that control line.
+    Begin your response with a single control line:
+      "KIND: answer" if the knowledge base above covers this and you are answering,
+      "KIND: question" if you must ask the customer for a missing detail,
+      "KIND: escalate" if the knowledge base clearly does NOT cover this and a human is genuinely required.
+    Do not escalate just because the ticket is important or the customer is upset; if the KB answers it, answer it. Put the actual reply on the lines after that control line (for escalate, no reply is needed).
+    On that same control line, after the KIND word, add "CONFIDENCE: N" where N is 0-100 = how sure you are the answer is correct AND complete from the knowledge base above (be honest; partial coverage = lower). Example: "KIND: answer CONFIDENCE: 85".
 
     Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Support Team'. Sound helpful and warm.
     """
@@ -225,17 +230,30 @@ def generate(state:State) -> dict:
     #print("DRAFT:",reply)
     #print("generate ran")
     lines = reply.strip().split("\n",1)
-    if lines[0].strip().lower().startswith("kind:"):
-        kind = lines[0].split(":",1)[1].strip().lower()
-        reply=lines[1].strip() if len(lines) > 1 else ""
+    confidence = None
+    first = lines[0].strip()
+    if first.lower().startswith("kind:"):
+        head = first.split(":",1)[1].strip()          # e.g. "answer CONFIDENCE: 85" or just "answer"
+        m = re.search(r"confidence[:=]?\s*(\d{1,3})", head, re.I)
+        if m:
+            confidence = min(100, int(m.group(1)))
+            head = head[:m.start()].strip()            # strip the confidence tail off the kind word
+        kind = head.split()[0].lower() if head else "answer"
+        reply = lines[1].strip() if len(lines) > 1 else ""
     else:
-        kind="answer"
-        
+        kind = "answer"
+    if kind == "escalate":
+        reply = ""
 
-    return {"draft":{"reply":reply,"kind":kind},"audit":["generate done"]}
+    return {"draft":{"reply":reply,"kind":kind,"confidence":confidence},"audit":["generate done"]}
 
 def review(state:State) -> dict:
     draft = state["draft"]["reply"]
+
+    if not draft.strip():
+        return {"compliance": {"verdict": "pass", "issues": []},
+                "review_count": state.get("review_count", 0),
+                "audit": ["review skipped (no draft)"]}
     
     issues = []
     
@@ -288,18 +306,27 @@ def decide(state:State) -> dict:
     else:
         c = state["classification"]
         comp = state.get("compliance", {})
+        draft = state.get("draft", {})
+        kind = draft.get("kind")
+        reply = (draft.get("reply") or "").strip()
+        # a real answer that passed review, graded by how confident we are it is right
+        answerable = kind == "answer" and bool(reply) and comp.get("verdict") != "fail"
+        grounded = grounded_confidence(draft.get("confidence"), state.get("retrieval"))
+        threshold = confidence_threshold(c.get("category"), c.get("priority"))
         if comp.get("verdict") == "fail":
             decision = {"action": "escalate", "reason": "failed compliance review"}
-        elif c["priority"] in ["critical", "high"]:
-            decision = {"action": "escalate", "reason": "high priority"}
-        elif c.get("business_impact") == "high":
-            decision={"action":"escalate","reason":"high business impact"}
-        elif c["category"] in ["refund", "billing"]:
-            decision = {"action": "escalate", "reason": "sensitive category"}
-        elif state["draft"].get("kind") == "question":
-            decision = {"action": "auto_send", "reason":"requesting more information"}
+        elif c["priority"] == "critical":
+            decision = {"action": "escalate", "reason": "critical priority"}
+        elif kind == "escalate":
+            decision = {"action": "escalate", "reason": "agent declined: needs a human"}
+        elif answerable and grounded >= threshold:
+            decision = {"action": "auto_send", "reason": "answerable from KB", "confidence": grounded}
+        elif answerable:
+            decision = {"action": "escalate", "reason": f"low confidence ({grounded} < {threshold})", "confidence": grounded}
+        elif kind == "question":
+            decision = {"action": "auto_send", "reason": "requesting more information"}
         else:
-            decision = {"action": "auto_send"}
+            decision = {"action": "escalate", "reason": "no usable draft"}
     #print("DECISION:", decision)
     #print("decide ran")
     if not err and decision["action"] == "escalate":

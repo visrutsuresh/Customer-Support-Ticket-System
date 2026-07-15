@@ -94,19 +94,21 @@ GENERATE_SYSTEM = """
 You are the Response Generation agent for customer support.
 Decide how to handle this ticket, gathering any context you need first.
 You MAY look the customer up to personalize the reply.
+You are shown the knowledge-base articles our retrieval already found for this ticket (in the context below). Read them before you decide.
 
 Tool available:
   crm_lookup(email) -> customer record (tier, orders) or null
 Do not repeat a tool call you already made. Once you have what you need, finish.
 
 Choose one outcome:
-  answer   - the knowledge base covers it; we can reply helpfully
-  question - a key detail is missing; we must ask the customer for exactly that
-  escalate - the KB does not cover it, or it needs a human
+  answer   - the retrieved articles cover the ticket; we can reply helpfully. PREFER THIS whenever the articles are enough to help.
+  question - a key detail is missing; we must ask the customer for exactly that.
+  escalate - ONLY if the retrieved articles clearly do NOT cover this AND a human is genuinely required. Do not escalate just because the ticket is important, urgent, or the customer is upset. If the KB answers it, answer it.
 
 Reply every turn with ONE JSON object, nothing else.
   To use the tool: {"thought":"...","action":"crm_lookup","args":{"email":"<email>"}}
-  To finish:       {"thought":"...","action":"finish","result":{"kind":"answer|question|escalate","notes":"<what to say, what is missing, or why escalate>"}}
+  To finish:       {"thought":"...","action":"finish","result":{"kind":"answer|question|escalate","confidence":<0-100>,"notes":"<what to say, what is missing, or why escalate>"}}
+confidence = 0-100, how sure you are the answer is correct AND complete from the retrieved articles. Only meaningful for kind=answer. Be honest: if the articles only partly cover it, score lower.
 """
 
 def _write_reply(ticket,articles,customer,notes,lane,tier,convo="") -> str:
@@ -134,25 +136,30 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None)
         f"{'Customer' if m['role'] == 'customer' else 'Support'}: {m['body']}"
         for m in public_messages(history)
     )
+    kb_preview = "\n".join(
+        f"- {a['title']}: {a.get('content', '')[:200]}" for a in articles
+    ) or "(retrieval returned no articles)"
     context = (f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n"
                 f"  subject: {ticket.subject}\n body: {ticket.body}\n"
-                f"Conversation so far (oldest first):\n{convo}")
+                f"Conversation so far (oldest first):\n{convo}\n"
+                f"Knowledge-base articles retrieved for this ticket:\n{kb_preview}")
     transcript,customer="", None
     for _ in range(MAX_STEPS):
         move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}\nYour JSON:",max_new_tokens=512))
         if move.get("action") == "finish":
             r = move["result"]
             kind = r.get("kind", "escalate")
+            conf = r.get("confidence")
             if kind == "escalate":
-                return {"kind": "escalate", "reply": ""}
+                return {"kind": "escalate", "reply": "", "confidence": conf}
             reply = _write_reply(ticket, articles, customer, r.get("notes", ""), lane, tier, convo)
-            return {"kind": kind, "reply": reply.strip()}
+            return {"kind": kind, "reply": reply.strip(), "confidence": conf}
         if move.get("action") == "crm_lookup":
             customer = tools.crm_lookup(**move.get("args", {}))
             transcript += f"\ncrm_lookup -> {customer}"
         else:
             transcript += f"\nunknown action {move.get('action')!r}"
-    return {"kind": "escalate", "reply": ""}      # fallback: never decided
+    return {"kind": "escalate", "reply": "", "confidence": None}      # fallback: never decided
 
 REVIEW_SYSTEM = """
 You are the Compliance and Quality Review agent for customer support.

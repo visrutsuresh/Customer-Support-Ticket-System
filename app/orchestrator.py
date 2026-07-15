@@ -7,7 +7,7 @@ from app import router
 from app.agents import classify_agent, generate_agent, retrieve_agent, review_agent
 from app.intake import normalize
 from app.pii import scan
-from app.state import State
+from app.state import State, grounded_confidence, confidence_threshold
 
 # --- node wrappers: read shared state, run the agent, write results back ---
 
@@ -90,21 +90,27 @@ def node_review(state: State) -> dict:
 def node_decide(state: State) -> dict:
     c = state["classification"]
     comp = state.get("compliance", {})
-    kind = state.get("draft", {}).get("kind")
+    draft = state.get("draft", {})
+    kind = draft.get("kind")
+    reply = (draft.get("reply") or "").strip()
+    # a real answer that passed review, graded by how confident we are it is right
+    answerable = kind == "answer" and bool(reply) and comp.get("verdict") != "fail"
+    grounded = grounded_confidence(draft.get("confidence"), state.get("retrieval"))
+    threshold = confidence_threshold(c.get("category"), c.get("priority"))
     if comp.get("verdict") == "fail":
         decision = {"action": "escalate", "reason": "failed compliance review"}
-    elif c.get("priority") in ["critical", "high"]:
-        decision = {"action": "escalate", "reason": "high priority"}
-    elif c.get("business_impact") == "high":
-        decision = {"action": "escalate", "reason": "high business impact"}
-    elif c.get("category") in ["refund", "billing"]:
-        decision = {"action": "escalate", "reason": "sensitive category"}
+    elif c.get("priority") == "critical":
+        decision = {"action": "escalate", "reason": "critical priority"}
     elif kind == "escalate":
         decision = {"action": "escalate", "reason": "agent suggested escalation"}
+    elif answerable and grounded >= threshold:
+        decision = {"action": "auto_send", "reason": "answerable from KB", "confidence": grounded}
+    elif answerable:
+        decision = {"action": "escalate", "reason": f"low confidence ({grounded} < {threshold})", "confidence": grounded}
     elif kind == "question":
         decision = {"action": "auto_send", "reason": "requesting more information"}
     else:
-        decision = {"action": "auto_send"}
+        decision = {"action": "escalate", "reason": "no usable draft"}
     return {"decision": decision, "audit": ["decide done"]}
 
 

@@ -59,6 +59,23 @@ def create_ticket(payload: TicketIn, background: BackgroundTasks):
     return {"ticket_id": ticket_id, "status": "processing"}
 
 
+ESCALATION_ACK = (
+    "Thanks for reaching out. This one needs a specialist's attention, so we've routed it to a "
+    "member of our team who will follow up with you directly. We appreciate your patience.\n\n"
+    "The Support Team"
+)
+
+
+def _ack_escalation(ticket_id: str) -> None:
+    # on escalate, tell the customer a human is coming so they are not left in silence.
+    # guard: never post the same acknowledgement twice in a row (safe across reprocess).
+    state = store.get(ticket_id)
+    agent_msgs = [m for m in (state or {}).get("messages", []) if m["role"] == "agent"]
+    if agent_msgs and agent_msgs[-1]["body"] == ESCALATION_ACK:
+        return
+    store.append_message(ticket_id, "agent", ESCALATION_ACK)
+
+
 def _process(ticket_id: str, raw: dict):
     final = active_graph.invoke(
         {
@@ -72,6 +89,8 @@ def _process(ticket_id: str, raw: dict):
         store.save(final)
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
+        if (final.get("decision") or {}).get("action") == "escalate":
+            _ack_escalation(ticket_id)
 
 
 def _reprocess(ticket_id: str, latest: str):
@@ -95,6 +114,8 @@ def _reprocess(ticket_id: str, latest: str):
         store.save(final)
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
+        if (final.get("decision") or {}).get("action") == "escalate":
+            _ack_escalation(ticket_id)
 
 
 @app.get("/tickets")
