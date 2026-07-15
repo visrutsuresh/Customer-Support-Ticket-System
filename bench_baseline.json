@@ -1,0 +1,140 @@
+{
+  "config": "autonomous / MODEL_TIER=full",
+  "tickets": 12,
+  "escalation_rate": 0.6666666666666666,
+  "auto_send_rate": 0.3333333333333333,
+  "rows": [
+    {
+      "subject": "Cannot log in",
+      "category": "technical",
+      "priority": "medium",
+      "action": "escalate",
+      "reason": "failed compliance review",
+      "grounded_confidence": 87,
+      "raw_confidence": 85,
+      "retrieval_top": 89,
+      "latency_s": 111.5
+    },
+    {
+      "subject": "Refund request",
+      "category": "refund",
+      "priority": "high",
+      "action": "escalate",
+      "reason": "low confidence (87 < 90)",
+      "grounded_confidence": 87,
+      "raw_confidence": 85,
+      "retrieval_top": 88,
+      "latency_s": 92.2
+    },
+    {
+      "subject": "Still no refund!!",
+      "category": "general",
+      "priority": "medium",
+      "action": "escalate",
+      "reason": "agent suggested escalation",
+      "grounded_confidence": 92,
+      "raw_confidence": null,
+      "retrieval_top": 93,
+      "latency_s": 57.1
+    },
+    {
+      "subject": "Where is my order",
+      "category": "shipping",
+      "priority": "medium",
+      "action": "auto_send",
+      "reason": "requesting more information",
+      "grounded_confidence": 67,
+      "raw_confidence": 50,
+      "retrieval_top": 84,
+      "latency_s": 61.1
+    },
+    {
+      "subject": "It stopped working",
+      "category": "general",
+      "priority": "medium",
+      "action": "auto_send",
+      "reason": "requesting more information",
+      "grounded_confidence": 51,
+      "raw_confidence": 20,
+      "retrieval_top": 83,
+      "latency_s": 68.8
+    },
+    {
+      "subject": "How do I reset my password",
+      "category": "account",
+      "priority": "low",
+      "action": "escalate",
+      "reason": "failed compliance review",
+      "grounded_confidence": 69,
+      "raw_confidence": 50,
+      "retrieval_top": 88,
+      "latency_s": 61.2
+    },
+    {
+      "subject": "App keeps crashing on launch",
+      "category": "general",
+      "priority": "medium",
+      "action": "escalate",
+      "reason": "agent suggested escalation",
+      "grounded_confidence": 78,
+      "raw_confidence": null,
+      "retrieval_top": 79,
+      "latency_s": 101.5
+    },
+    {
+      "subject": "Double charged this month",
+      "category": "general",
+      "priority": "medium",
+      "action": "escalate",
+      "reason": "failed compliance review",
+      "grounded_confidence": 87,
+      "raw_confidence": 85,
+      "retrieval_top": 89,
+      "latency_s": 80.3
+    },
+    {
+      "subject": "Order 10432 never arrived",
+      "category": "general",
+      "priority": "medium",
+      "action": "escalate",
+      "reason": "agent suggested escalation",
+      "grounded_confidence": 86,
+      "raw_confidence": null,
+      "retrieval_top": 86,
+      "latency_s": 70.8
+    },
+    {
+      "subject": "Change my email address",
+      "category": "account",
+      "priority": "medium",
+      "action": "auto_send",
+      "reason": "answerable from KB",
+      "grounded_confidence": 89,
+      "raw_confidence": 85,
+      "retrieval_top": 93,
+      "latency_s": 41.8
+    },
+    {
+      "subject": "Why was I charged 9.99",
+      "category": "general",
+      "priority": "medium",
+      "action": "auto_send",
+      "reason": "requesting more information",
+      "grounded_confidence": 68,
+      "raw_confidence": 50,
+      "retrieval_top": 85,
+      "latency_s": 70.1
+    },
+    {
+      "subject": "Track my package",
+      "category": "shipping",
+      "priority": "low",
+      "action": "escalate",
+      "reason": "agent suggested escalation",
+      "grounded_confidence": 86,
+      "raw_confidence": null,
+      "retrieval_top": 86,
+      "latency_s": 46.5
+    }
+  ]
+}

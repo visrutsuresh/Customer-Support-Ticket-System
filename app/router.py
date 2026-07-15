@@ -24,10 +24,11 @@ def _modal(url:str, prompt: str, max_new_tokens: int) -> str:
 
 def _claude(model: str, prompt: str, max_new_tokens: int) ->str:
     from anthropic import Anthropic
-    client = Anthropic() #reads ANTHROPIC_API_KEY from the environment
+    client = Anthropic(timeout=60, max_retries=1) #reads ANTHROPIC_API_KEY; hard timeout so a stalled call fails fast instead of hanging the batch/demo
     msg = client.messages.create(
         model=model,
         max_tokens= max_new_tokens,
+        temperature=0,   # greedy, to match the already-greedy private lane so runs are reproducible
         messages = [{"role": "user", "content": prompt }],
     )
     return msg.content[0].text
