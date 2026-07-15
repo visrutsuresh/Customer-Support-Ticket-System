@@ -285,7 +285,8 @@ def review(state:State) -> dict:
     or
     FAIL: <one short reason>
     """
-    raw = router.think(prompt).strip()
+    r = state["routing"]
+    raw = router.think(prompt, lane=r["lane"], level=r["tier"]).strip()
     if raw.upper().startswith("FAIL"):
         reason = raw.split(":", 1)[1].strip() if ":" in raw else "policy violation"
         issues.append(reason)

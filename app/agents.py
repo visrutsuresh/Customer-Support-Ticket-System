@@ -69,13 +69,13 @@ Reply every turn with ONE JSON object, nothing else.
 Search at least once before finishing. Keep only titles that genuinely help.
 """
 
-def retrieve_agent(ticket) -> list:
+def retrieve_agent(ticket,lane="private",level="complex") -> list:
     context=f"Ticket:\n subject: {ticket.subject}\n body:{ticket.body}"
     transcript = ""
     seen={} #title -> full article dict
     for _ in range(MAX_STEPS):
         prompt = f"{RETRIEVE_SYSTEM}\n\n{context}\n{transcript}\nYOUR JSON:"
-        move = _parse(router.think(prompt,max_new_tokens=512))
+        move = _parse(router.think(prompt,max_new_tokens=512,lane=lane,level=level))
         if move.get("action") =="finish":
             titles = move["result"].get("relevant_titles",[])
             chosen = [seen[t] for t in titles if t in seen]
@@ -176,7 +176,7 @@ FAIL if the reply breaks a policy rule, or states something about the customer's
 that the CRM contradicts. Asking the customer for information is allowed and PASSES. When unsure, PASS.
 """
 
-def review_agent(ticket, draft_reply) -> dict:
+def review_agent(ticket, draft_reply,lane="private",level="complex") -> dict:
     # deterministic safety checks (always run, never optional)
     issues = []
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft_reply):
@@ -196,7 +196,7 @@ def review_agent(ticket, draft_reply) -> dict:
     transcript = ""
     for _ in range(MAX_STEPS):
         prompt = f"{REVIEW_SYSTEM}\n\nPolicy:\n{policy}\n\n{context}\n{transcript}\nYour JSON:"
-        move = _parse(router.think(prompt, max_new_tokens=512))
+        move = _parse(router.think(prompt, max_new_tokens=512,lane=lane,level=level))
         if move.get("action") == "finish":
             if move["result"].get("verdict") == "fail":
                 issues.extend(move["result"].get("issues", []))

@@ -45,11 +45,6 @@ def call_model (model_id: str, prompt: str, max_new_tokens: int=512) -> str:
     
     raise ValueError(f"unknown model_id: {model_id}")
 
-# resolvers: the toggle decides which model_id to use 
-def check_model () -> str:
-    #reasoning checks (classify, difficulty, sensitivity, review): 14B when paying for quality, else 3B
-    return "3b" if MODEL_TIER == "dev" else "14b"
-
 def intended_model(lane: str, level: str) -> str:
     #the ideal full- 2x2 pick, ALWAYS returned for display, regardless of the toggle
     grid = {
@@ -68,9 +63,20 @@ def reply_model(lane: str, level:str) -> str:
         return "14b" if level == "complex" else "3b"
     return intended_model(lane,level) #full
 
-def think(prompt: str, max_new_tokens: int=256) -> str:
+def think_model(lane: str = None, level: str = None) -> str:
+    #which model does the agent's reasoning capped by the MODEL_TIER in .env
+    #dev/local pin reasoning to private line; only 'full' unlocks cloud lane with Claude
+    if MODEL_TIER == "dev":
+        return "3b"
+    if MODEL_TIER =="local":
+        return "14b"
+    if lane!="cloud":
+        return "14b"
+    return intended_model("cloud",level or "complex")
+
+def think(prompt: str, max_new_tokens: int=256, lane: str=None, level: str = None) -> str:
     #every internal reasoning check goes through here
-    return call_model(check_model(),prompt,max_new_tokens)
+    return call_model(think_model(lane,level),prompt,max_new_tokens)
 
 def generate_reply(prompt:str, lane: str, level: str, max_new_tokens: int = 512) -> str:
     # the customer facing reply, model chosen by the 2x2 matrix +toggle

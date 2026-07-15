@@ -52,8 +52,9 @@ def node_route(state: State) -> dict:
 
 
 def node_retrieve(state: State) -> dict:
+    r = state.get("routing") or {"lane": "private", "tier": "complex"}
     return {
-        "retrieval": retrieve_agent(state["ticket"]),
+        "retrieval": retrieve_agent(state["ticket"], r["lane"], r["tier"]),
         "audit": ["retrieve (agent) done"],
     }
 
@@ -80,8 +81,9 @@ def node_review(state: State) -> dict:
             "compliance": {"verdict": "pass", "issues": []},
             "audit": ["review skipped (no draft)"],
         }
+    r = state.get("routing") or {"lane": "private", "tier": "complex"}
     return {
-        "compliance": review_agent(state["ticket"], reply),
+        "compliance": review_agent(state["ticket"], reply, r["lane"], r["tier"]),
         "review_count": state.get("review_count", 0) + 1,
         "audit": ["review (agent) done"],
     }
@@ -145,11 +147,14 @@ def route_next(state: State) -> str:
         failed = state["compliance"]["verdict"] == "fail"
         if failed and state.get("review_count", 0) < 2:
             # let the AI make the call: rewrite the reply, or escalate as-is?
+            r = state.get("routing") or {"lane": "private", "tier": "complex"}
             choice = (
                 router.think(
                     f"A support reply failed compliance for: {state['compliance']['issues']}. "
                     f'Reply with ONE word: "generate" to rewrite it, or "decide" to escalate as-is.',
                     max_new_tokens=8,
+                    lane=r["lane"],
+                    level=r["tier"],
                 )
                 .strip()
                 .lower()
