@@ -219,7 +219,7 @@ def generate(state:State) -> dict:
       "KIND: answer" if the knowledge base above covers this and you are answering,
       "KIND: question" if you must ask the customer for a missing detail,
       "KIND: escalate" if the knowledge base clearly does NOT cover this and a human is genuinely required.
-    Do not escalate just because the ticket is important or the customer is upset; if the KB answers it, answer it. Put the actual reply on the lines after that control line (for escalate, no reply is needed).
+    Do not escalate just because the ticket is important or the customer is upset; if the KB answers it, answer it. Prefer "KIND: question" over "KIND: escalate" whenever the only thing missing is a detail the customer can provide (an order number, which charge, the exact error message). Put the actual reply on the lines after that control line (for escalate, no reply is needed).
     On that same control line, after the KIND word, add "CONFIDENCE: N" where N is 0-100 = how sure you are the answer is correct AND complete from the knowledge base above (be honest; partial coverage = lower). Example: "KIND: answer CONFIDENCE: 85".
 
     Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Support Team'. Sound helpful and warm.

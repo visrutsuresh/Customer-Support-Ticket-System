@@ -2,7 +2,11 @@ import weaviate
 from app.embed import embed
 from weaviate.classes.query import MetadataQuery
 
-def search(text: str, k:int=3) -> list[dict]:
+# ponytail: floor only catches genuinely off-topic hits. Same-band junk (KB has no good
+# article, everything scores ~82-85) is a content gap a score floor cannot fix.
+RELEVANCE_FLOOR = 60
+
+def search(text: str, k:int=5) -> list[dict]:
     client = weaviate.connect_to_local()
     try:
         kb = client.collections.get("Knowledge")
@@ -18,7 +22,7 @@ def search(text: str, k:int=3) -> list[dict]:
             dist = o.metadata.distance or 0.0
             d["score"] = round((1-dist/2)*100,1) #cosine distance to 0..100 relevance conversion
             out.append(d)
-        return out
+        return [h for h in out if h["score"] >= RELEVANCE_FLOOR]
 
     finally:
         client.close()

@@ -18,18 +18,90 @@ TICKET_TIMEOUT_S = 180
 # Fixed batch, committed so the run repeats. First 8 mirror demo.py; the last 4
 # add money / shipping-with-order-id / account cases (and seed item 16d's tools).
 BATCH = [
-    {"source": "email", "name": "Alice Tan",   "email": "alice.tan@example.com",   "subject": "Cannot log in", "body": "my password reset link is broken"},
-    {"source": "email", "name": "Bob Rivera",  "email": "bob.rivera@example.com",  "subject": "Refund request", "body": "I want my money back for an unused subscription"},
-    {"source": "chat",  "name": "Chen Wei",    "email": "chen.wei@example.com",    "subject": "Still no refund!!", "body": "This is unacceptable, I have waited two weeks and I am furious"},
-    {"source": "email", "name": "Dana Okoro",  "email": "dana.okoro@example.com",  "subject": "Where is my order", "body": "tracking has not updated in three days"},
-    {"source": "chat",  "name": "Evan Lee",    "email": "evan.lee@example.com",    "subject": "It stopped working", "body": "nothing works please help"},
-    {"source": "form",  "name": "Fiona Adams", "email": "fiona.adams@example.com", "subject": "How do I reset my password", "body": "I forgot my password and want to reset it. What are the steps?"},
-    {"source": "email", "name": "Grace Hall",  "email": "grace.hall@example.com",  "subject": "App keeps crashing on launch", "body": "the app crashes every time I open it, please call me back on 555-0142-8890"},
-    {"source": "email", "name": "Hana Sato",   "email": "hana.sato@example.com",   "subject": "Double charged this month", "body": "I was billed twice for my subscription, please refund one charge."},
-    {"source": "email", "name": "Ivan Petrov", "email": "ivan.petrov@example.com", "subject": "Order 10432 never arrived", "body": "My order #10432 was supposed to arrive last week and there is still nothing."},
-    {"source": "form",  "name": "Julia Kim",   "email": "julia.kim@example.com",   "subject": "Change my email address", "body": "I want to update the email on my account to a new one, how do I do that?"},
-    {"source": "chat",  "name": "Kofi Mensah", "email": "kofi.mensah@example.com", "subject": "Why was I charged 9.99", "body": "I see a 9.99 charge this month and I do not know what it is for."},
-    {"source": "email", "name": "Lena Brooks", "email": "lena.brooks@example.com", "subject": "Track my package", "body": "Can you tell me where my package is right now?"},
+    {
+        "source": "email",
+        "name": "Alice Tan",
+        "email": "alice.tan@example.com",
+        "subject": "Cannot log in",
+        "body": "my password reset link is broken",
+    },
+    {
+        "source": "email",
+        "name": "Bob Rivera",
+        "email": "bob.rivera@example.com",
+        "subject": "Refund request",
+        "body": "I want my money back for an unused subscription",
+    },
+    {
+        "source": "chat",
+        "name": "Chen Wei",
+        "email": "chen.wei@example.com",
+        "subject": "Still no refund!!",
+        "body": "This is unacceptable, I have waited two weeks and I am furious",
+    },
+    {
+        "source": "email",
+        "name": "Dana Okoro",
+        "email": "dana.okoro@example.com",
+        "subject": "Where is my order",
+        "body": "tracking has not updated in three days",
+    },
+    {
+        "source": "chat",
+        "name": "Evan Lee",
+        "email": "evan.lee@example.com",
+        "subject": "It stopped working",
+        "body": "nothing works please help",
+    },
+    {
+        "source": "form",
+        "name": "Fiona Adams",
+        "email": "fiona.adams@example.com",
+        "subject": "How do I reset my password",
+        "body": "I forgot my password and want to reset it. What are the steps?",
+    },
+    {
+        "source": "email",
+        "name": "Grace Hall",
+        "email": "grace.hall@example.com",
+        "subject": "App keeps crashing on launch",
+        "body": "the app crashes every time I open it, please call me back on 555-0142-8890",
+    },
+    {
+        "source": "email",
+        "name": "Hana Sato",
+        "email": "hana.sato@example.com",
+        "subject": "Double charged this month",
+        "body": "I was billed twice for my subscription, please refund one charge.",
+    },
+    {
+        "source": "email",
+        "name": "Ivan Petrov",
+        "email": "ivan.petrov@example.com",
+        "subject": "Order 10432 never arrived",
+        "body": "My order #10432 was supposed to arrive last week and there is still nothing.",
+    },
+    {
+        "source": "form",
+        "name": "Julia Kim",
+        "email": "julia.kim@example.com",
+        "subject": "Change my email address",
+        "body": "I want to update the email on my account to a new one, how do I do that?",
+    },
+    {
+        "source": "chat",
+        "name": "Kofi Mensah",
+        "email": "kofi.mensah@example.com",
+        "subject": "Why was I charged 9.99",
+        "body": "I see a 9.99 charge this month and I do not know what it is for.",
+    },
+    {
+        "source": "email",
+        "name": "Lena Brooks",
+        "email": "lena.brooks@example.com",
+        "subject": "Track my package",
+        "body": "Can you tell me where my package is right now?",
+    },
 ]
 
 
@@ -46,6 +118,7 @@ def run_one(raw: dict) -> dict:
     dt = time.perf_counter() - t0
     c = final.get("classification") or {}
     d = final.get("decision") or {}
+    comp = final.get("compliance") or {}
     draft = final.get("draft") or {}
     retrieval = final.get("retrieval") or []
     raw_conf = draft.get("confidence")
@@ -58,6 +131,8 @@ def run_one(raw: dict) -> dict:
         "priority": c.get("priority"),
         "action": d.get("action"),
         "reason": d.get("reason"),
+        "compliance_verdict": comp.get("verdict"),
+        "compliance_issues": comp.get("issues"),
         "grounded_confidence": grounded,
         "raw_confidence": raw_conf,
         "retrieval_top": round(top),
@@ -81,13 +156,17 @@ def main() -> None:
     lats = [r["latency_s"] for r in rows if isinstance(r.get("latency_s"), (int, float))]
 
     print("\n" + "=" * 100)
-    print(f"{'#':>2}  {'category':10} {'priority':8} {'action':10} {'gconf':>5} {'raw':>4} {'top':>4} {'lat':>6}  reason")
+    print(
+        f"{'#':>2}  {'category':10} {'priority':8} {'action':10} {'gconf':>5} {'raw':>4} {'top':>4} {'lat':>6}  reason"
+    )
     print("-" * 100)
     for i, r in enumerate(rows, start=1):
-        print(f"{i:>2}  {str(r.get('category')):10} {str(r.get('priority')):8} "
-              f"{str(r.get('action')):10} {str(r.get('grounded_confidence')):>5} "
-              f"{str(r.get('raw_confidence')):>4} {str(r.get('retrieval_top')):>4} "
-              f"{str(r.get('latency_s')):>6}  {r.get('reason')}")
+        print(
+            f"{i:>2}  {str(r.get('category')):10} {str(r.get('priority')):8} "
+            f"{str(r.get('action')):10} {str(r.get('grounded_confidence')):>5} "
+            f"{str(r.get('raw_confidence')):>4} {str(r.get('retrieval_top')):>4} "
+            f"{str(r.get('latency_s')):>6}  {r.get('reason')}"
+        )
     print("=" * 100)
     print(f"config          : autonomous / MODEL_TIER={router.MODEL_TIER}")
     print(f"tickets         : {total}")
@@ -95,6 +174,12 @@ def main() -> None:
     print(f"auto-send rate  : {len(auto)}/{total} = {len(auto) / total:.0%}")
     print(f"avg grounded cnf: {mean(confs):.0f}" if confs else "avg grounded cnf: n/a")
     print(f"avg latency     : {mean(lats):.1f}s" if lats else "avg latency     : n/a")
+
+    fails = [(i, r) for i, r in enumerate(rows, start=1) if r.get("compliance_verdict") == "fail"]
+    if fails:
+        print("\ncompliance failures (what the review gate actually objected to):")
+        for i, r in fails:
+            print(f"  #{i} {r['subject']!r}: {r.get('compliance_issues')}")
 
     out = {
         "config": f"autonomous / MODEL_TIER={router.MODEL_TIER}",
