@@ -1,16 +1,19 @@
-import json 
+import json
 import re
-from app.pii import scan
-from app.state import public_messages
+
 from app import router, tools
 from app.kb import index_resolved
+from app.pii import scan
+from app.state import public_messages
 
 MAX_STEPS = 5
 
-def _parse(raw:str) -> dict:
-    #same trick as graph.py: grab the first {...} block the model emitted
+
+def _parse(raw: str) -> dict:
+    # same trick as graph.py: grab the first {...} block the model emitted
     s, e = raw.find("{"), raw.rfind("}")
-    return json.loads(raw[s:e+1])
+    return json.loads(raw[s : e + 1])
+
 
 CLASSIFY_SYSTEM = """
 You are the Classification and Prioritization agent for customer support.
@@ -35,25 +38,25 @@ Definitions:
   sensitive:       true if the ticket contains or discusses sensitive data (financial/card/bank, government ID, health, passwords/2FA, legal matters, protected personal traits), else false.
 """
 
+
 def classify_agent(ticket) -> dict:
-    context = (f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n"
-                f"  subject: {ticket.subject}\n body:{ticket.body}")
-    
+    context = f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n  subject: {ticket.subject}\n body:{ticket.body}"
+
     transcript = ""
 
     for _ in range(MAX_STEPS):
         prompt = f"{CLASSIFY_SYSTEM}\n\n {context}\n{transcript}\nYour JSON:"
-        move = _parse(router.think(prompt, max_new_tokens = 512))
+        move = _parse(router.think(prompt, max_new_tokens=512))
         if move.get("action") == "finish":
             return move["result"]
-        
-        #else it's a tool call: run it, feed the result back into the loop
-        obs = tools.run_tool(move.get("action"), move.get("args",{}))
-        transcript += f"\nYou called {move.get('action')} ({move.get('args',{})}) -> {obs}"
-    
-    #fallback: it never finished in MAX_STEPS return a safe default
-    return {"category": "general", "priority": "Medium", "business_impact": "medium",
-            "sentiment": "neutral", "difficulty": "simple", "sensitive": False}
+
+        # else it's a tool call: run it, feed the result back into the loop
+        obs = tools.run_tool(move.get("action"), move.get("args", {}))
+        transcript += f"\nYou called {move.get('action')} ({move.get('args', {})}) -> {obs}"
+
+    # fallback: it never finished in MAX_STEPS return a safe default
+    return {"category": "general", "priority": "Medium", "business_impact": "medium", "sentiment": "neutral", "difficulty": "simple", "sensitive": False}
+
 
 RETRIEVE_SYSTEM = """
 You are the Knowledge Retrieval agent for customer support.
@@ -70,19 +73,20 @@ Reply every turn with ONE JSON object, nothing else.
 Search at least once before finishing. Keep only titles that genuinely help.
 """
 
-def retrieve_agent(ticket,lane="private",level="complex") -> list:
-    context=f"Ticket:\n subject: {ticket.subject}\n body:{ticket.body}"
+
+def retrieve_agent(ticket, lane="private", level="complex") -> list:
+    context = f"Ticket:\n subject: {ticket.subject}\n body:{ticket.body}"
     transcript = ""
-    seen={} #title -> full article dict
+    seen = {}  # title -> full article dict
     for _ in range(MAX_STEPS):
         prompt = f"{RETRIEVE_SYSTEM}\n\n{context}\n{transcript}\nYOUR JSON:"
-        move = _parse(router.think(prompt,max_new_tokens=512,lane=lane,level=level))
-        if move.get("action") =="finish":
-            titles = move["result"].get("relevant_titles",[])
+        move = _parse(router.think(prompt, max_new_tokens=512, lane=lane, level=level))
+        if move.get("action") == "finish":
+            titles = move["result"].get("relevant_titles", [])
             chosen = [seen[t] for t in titles if t in seen]
             return chosen or list(seen.values())
-        if move.get("action")== "kb_search":
-            hits = tools.kb_search(move.get("args",{}).get("query",""))
+        if move.get("action") == "kb_search":
+            hits = tools.kb_search(move.get("args", {}).get("query", ""))
             for h in hits:
                 seen[h["title"]] = h
             summary = [{"title": h["title"], "score": h["score"]} for h in hits]
@@ -90,6 +94,7 @@ def retrieve_agent(ticket,lane="private",level="complex") -> list:
         else:
             transcript += f"\nunknown action {move.get('action')!r}"
     return list(seen.values())
+
 
 GENERATE_SYSTEM = """
 You are the Response Generation agent for customer support.
@@ -114,11 +119,11 @@ Reply every turn with ONE JSON object, nothing else.
 confidence = 0-100, how sure you are the answer is correct AND complete from the retrieved articles. Only meaningful for kind=answer. Be honest: if the articles only partly cover it, score lower.
 """
 
-def _write_reply(ticket,articles,customer,notes,lane,tier,convo="") -> str:
+
+def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str:
     kb_text = "\n\n".join(f"[{a['title']}]\n{a['content']}" for a in articles)
     greeting = f"Hi {ticket.customer_name.split()[0]}," if ticket.customer_name else "Hi there,"
-    cust = (f"tier={customer['tier']}, orders={customer['orders']}"
-            if customer else "no customer record found")
+    cust = f"tier={customer['tier']}, orders={customer['orders']}" if customer else "no customer record found"
     prompt = f"""
     You are a warm, helpful customer support agent. Write a reply to this ticket.
     Customer: {cust}
@@ -132,23 +137,21 @@ def _write_reply(ticket,articles,customer,notes,lane,tier,convo="") -> str:
     {kb_text}
     Open with exactly "{greeting}" and sign off as 'The Support Team'. No placeholders like [NAME.
     """
-    return router.generate_reply(prompt,lane,tier)
+    return router.generate_reply(prompt, lane, tier)
+
 
 def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None) -> dict:
-    convo = "\n".join(
-        f"{'Customer' if m['role'] == 'customer' else 'Support'}: {m['body']}"
-        for m in public_messages(history)
+    convo = "\n".join(f"{'Customer' if m['role'] == 'customer' else 'Support'}: {m['body']}" for m in public_messages(history))
+    kb_preview = "\n".join(f"- {a['title']}: {a.get('content', '')[:200]}" for a in articles) or "(retrieval returned no articles)"
+    context = (
+        f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n"
+        f"  subject: {ticket.subject}\n body: {ticket.body}\n"
+        f"Conversation so far (oldest first):\n{convo}\n"
+        f"Knowledge-base articles retrieved for this ticket:\n{kb_preview}"
     )
-    kb_preview = "\n".join(
-        f"- {a['title']}: {a.get('content', '')[:200]}" for a in articles
-    ) or "(retrieval returned no articles)"
-    context = (f"Ticket:\n from: {ticket.customer_name} <{ticket.customer_email}>\n"
-                f"  subject: {ticket.subject}\n body: {ticket.body}\n"
-                f"Conversation so far (oldest first):\n{convo}\n"
-                f"Knowledge-base articles retrieved for this ticket:\n{kb_preview}")
-    transcript,customer="", None
+    transcript, customer = "", None
     for _ in range(MAX_STEPS):
-        move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}\nYour JSON:",max_new_tokens=512))
+        move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}\nYour JSON:", max_new_tokens=512))
         if move.get("action") == "finish":
             r = move["result"]
             kind = r.get("kind", "escalate")
@@ -162,7 +165,8 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None)
             transcript += f"\ncrm_lookup -> {customer}"
         else:
             transcript += f"\nunknown action {move.get('action')!r}"
-    return {"kind": "escalate", "reply": "", "confidence": None}      # fallback: never decided
+    return {"kind": "escalate", "reply": "", "confidence": None}  # fallback: never decided
+
 
 REVIEW_SYSTEM = """
 You are the Compliance and Quality Review agent for customer support.
@@ -179,7 +183,8 @@ FAIL if the reply breaks a policy rule, or states something about the customer's
 that the CRM contradicts. Asking the customer for information is allowed and PASSES. When unsure, PASS.
 """
 
-def review_agent(ticket, draft_reply,lane="private",level="complex") -> dict:
+
+def review_agent(ticket, draft_reply, lane="private", level="complex") -> dict:
     # deterministic safety checks (always run, never optional)
     issues = []
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft_reply):
@@ -193,13 +198,11 @@ def review_agent(ticket, draft_reply,lane="private",level="complex") -> dict:
     # autonomous policy + fact-check pass
     with open("policy.md") as f:
         policy = f.read()
-    context = (f"Customer email: {ticket.customer_email}\n"
-               f"Ticket: {ticket.subject} - {ticket.body}\n"
-               f"Draft reply to check:\n{draft_reply}")
+    context = f"Customer email: {ticket.customer_email}\nTicket: {ticket.subject} - {ticket.body}\nDraft reply to check:\n{draft_reply}"
     transcript = ""
     for _ in range(MAX_STEPS):
         prompt = f"{REVIEW_SYSTEM}\n\nPolicy:\n{policy}\n\n{context}\n{transcript}\nYour JSON:"
-        move = _parse(router.think(prompt, max_new_tokens=512,lane=lane,level=level))
+        move = _parse(router.think(prompt, max_new_tokens=512, lane=lane, level=level))
         if move.get("action") == "finish":
             if move["result"].get("verdict") == "fail":
                 issues.extend(move["result"].get("issues", []))
@@ -210,6 +213,7 @@ def review_agent(ticket, draft_reply,lane="private",level="complex") -> dict:
             transcript += f"\nunknown action {move.get('action')!r}"
 
     return {"verdict": "fail" if issues else "pass", "issues": issues}
+
 
 LEARN_SYSTEM = """You are the Learning agent for customer support.
 A ticket has just been resolved. Decide whether its problem+solution is worth saving to the
@@ -222,18 +226,21 @@ Reply with ONE JSON object, nothing else:
   {"thought":"...", "save": false}
 """
 
+
 def learn_agent(ticket, draft_reply, resolved: bool) -> dict:
     if not resolved or not draft_reply:
         return {"learned": False, "reason": "ticket not resolved"}
     # autonomous quality gate: is this resolution worth keeping?
-    prompt = (f"A support ticket was resolved. Decide if its resolution is general and reusable "
-              f"enough to help future tickets (not a one-off, no sensitive personal data).\n"
-              f"Ticket: {ticket.subject} - {ticket.body}\n"
-              f"Resolution: {draft_reply}\n"
-              f'Reply with ONE JSON object: {{"thought":"...","save":true}} or {{"thought":"...","save":false}}')
+    prompt = (
+        f"A support ticket was resolved. Decide if its resolution is general and reusable "
+        f"enough to help future tickets (not a one-off, no sensitive personal data).\n"
+        f"Ticket: {ticket.subject} - {ticket.body}\n"
+        f"Resolution: {draft_reply}\n"
+        f'Reply with ONE JSON object: {{"thought":"...","save":true}} or {{"thought":"...","save":false}}'
+    )
     move = _parse(router.think(prompt, max_new_tokens=256))
     if move.get("save"):
         content = f"Problem: {ticket.body} Resolution: {draft_reply}"
-        index_resolved(ticket.subject, content)      # stays a resolved-ticket record, source preserved
+        index_resolved(ticket.subject, content)  # stays a resolved-ticket record, source preserved
         return {"learned": True}
     return {"learned": False, "reason": "not general enough"}

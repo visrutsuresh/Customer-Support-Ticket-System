@@ -1,9 +1,9 @@
-#Synthetic support roster.
-#Maps a ticket's priority to an experience tier.
-#Then picks a specific assignee from that tier.
+# Synthetic support roster.
+# Maps a ticket's priority to an experience tier.
+# Then picks a specific assignee from that tier.
 
-ROSTER={
-    "senior":[
+ROSTER = {
+    "senior": [
         {
             "name": "Priya Nair",
             "email": "priya.nair@support.example.com",
@@ -13,16 +13,15 @@ ROSTER={
             "email": "marcus.reed@support.example.com",
         },
     ],
-    "mid":[
+    "mid": [
         {
             "name": "Sofia Alvarez",
             "email": "sofia.alvarez@support.example.com",
         },
         {
             "name": "Tom Becker",
-            "email":"tom.becker@support.example.com",
-
-        }
+            "email": "tom.becker@support.example.com",
+        },
     ],
     "junior": [
         {
@@ -32,16 +31,17 @@ ROSTER={
     ],
 }
 
-#which experience tier handles each priority
+# which experience tier handles each priority
 TIER_FOR_PRIORITY = {
-    "critical" : "senior",
-    "high" : "senior",
+    "critical": "senior",
+    "high": "senior",
     "medium": "mid",
     "low": "junior",
 }
 
+
 def assign(priority: str, ticket_id: str) -> dict:
-    tier = TIER_FOR_PRIORITY.get(priority, "mid") #unknown priority gets sent -> mid (safe default)
+    tier = TIER_FOR_PRIORITY.get(priority, "mid")  # unknown priority gets sent -> mid (safe default)
     team = ROSTER[tier]
 
     # spread load deterministically across the tier, no shared counter needed

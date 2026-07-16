@@ -1,19 +1,22 @@
-from app import crm,kb
+from app import crm, kb
 
-TOOLS = {} #name -> function (the phone book)
+TOOLS = {}  # name -> function (the phone book)
+
 
 def tool(fn):
-    #Register a function so an agent can call it by name
-    TOOLS[fn.__name__]=fn
+    # Register a function so an agent can call it by name
+    TOOLS[fn.__name__] = fn
     return fn
 
+
 @tool
-def crm_lookup(email: str) -> dict|None:
-    #Look up a customer by email. Returns their record or None
+def crm_lookup(email: str) -> dict | None:
+    # Look up a customer by email. Returns their record or None
     return crm.lookup(email)
 
-def run_tool(name:str,  args:dict) -> str:
-    #Dial a tool by name with its args; return the result as text
+
+def run_tool(name: str, args: dict) -> str:
+    # Dial a tool by name with its args; return the result as text
     fn = TOOLS.get(name)
     if fn is None:
         return f"ERROR:unknown tool {name!r}"
@@ -23,7 +26,8 @@ def run_tool(name:str,  args:dict) -> str:
     except Exception as e:
         return f"ERROR: {e}"
 
+
 @tool
-def kb_search(query:str) -> list:
-    #Search the knowledge base + past resolved tickets. Returns ranked articles.
+def kb_search(query: str) -> list:
+    # Search the knowledge base + past resolved tickets. Returns ranked articles.
     return kb.search(query)

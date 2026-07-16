@@ -10,6 +10,7 @@ class TicketingAdapter(Protocol):
     with the same method and a different field map. No real API calls here:
     this is the integration SEAM (req 29), not a live integration.
     """
+
     def to_canonical(self, payload: dict) -> dict: ...
 
 
@@ -27,7 +28,7 @@ class ZendeskAdapter:
         return {
             "source": _ZENDESK_CHANNEL.get(channel, "form"),  # unknown -> form
             "subject": t["subject"],
-            "body": t["description"],          # Zendesk calls the body "description"
+            "body": t["description"],  # Zendesk calls the body "description"
             "customer_id": str(r["id"]) if r.get("id") is not None else None,
             "name": r.get("name"),
             "email": r.get("email"),

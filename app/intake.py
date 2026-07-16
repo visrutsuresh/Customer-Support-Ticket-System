@@ -1,16 +1,18 @@
-from app.state import Ticket
 import uuid
 from datetime import datetime
 
+from app.state import Ticket
+
+
 def normalize(raw: dict) -> Ticket:
     """Turn a raw input payload into a canonical Ticket"""
-    source=raw["source"]
-    if source =="voice_transcript":
-        body=raw["transcript"]
-        subject=" ".join(body.split()[:6])
+    source = raw["source"]
+    if source == "voice_transcript":
+        body = raw["transcript"]
+        subject = " ".join(body.split()[:6])
     else:
-        subject=raw["subject"]
-        body=raw["body"]
+        subject = raw["subject"]
+        body = raw["body"]
     return Ticket(
         ticket_id=raw.get("ticket_id") or f"T-{uuid.uuid4().hex[:8]}",
         source=source,

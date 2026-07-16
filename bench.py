@@ -156,9 +156,7 @@ def main() -> None:
     lats = [r["latency_s"] for r in rows if isinstance(r.get("latency_s"), (int, float))]
 
     print("\n" + "=" * 100)
-    print(
-        f"{'#':>2}  {'category':10} {'priority':8} {'action':10} {'gconf':>5} {'raw':>4} {'top':>4} {'lat':>6}  reason"
-    )
+    print(f"{'#':>2}  {'category':10} {'priority':8} {'action':10} {'gconf':>5} {'raw':>4} {'top':>4} {'lat':>6}  reason")
     print("-" * 100)
     for i, r in enumerate(rows, start=1):
         print(

@@ -7,7 +7,7 @@ from app import router
 from app.agents import classify_agent, generate_agent, retrieve_agent, review_agent
 from app.intake import normalize
 from app.pii import scan
-from app.state import State, grounded_confidence, confidence_threshold
+from app.state import State, confidence_threshold, grounded_confidence
 
 # --- node wrappers: read shared state, run the agent, write results back ---
 
@@ -26,9 +26,7 @@ def node_intake(state: State) -> dict:
 
 def node_classify(state: State) -> dict:
     c = classify_agent(state["ticket"])
-    c = {
-        k: (v.lower() if isinstance(v, str) else v) for k, v in c.items()
-    }  # match old normalization
+    c = {k: (v.lower() if isinstance(v, str) else v) for k, v in c.items()}  # match old normalization
     return {"classification": c, "audit": ["classify (agent) done"]}
 
 
@@ -150,8 +148,7 @@ def route_next(state: State) -> str:
             r = state.get("routing") or {"lane": "private", "tier": "complex"}
             choice = (
                 router.think(
-                    f"A support reply failed compliance for: {state['compliance']['issues']}. "
-                    f'Reply with ONE word: "generate" to rewrite it, or "decide" to escalate as-is.',
+                    f'A support reply failed compliance for: {state["compliance"]["issues"]}. Reply with ONE word: "generate" to rewrite it, or "decide" to escalate as-is.',
                     max_new_tokens=8,
                     lane=r["lane"],
                     level=r["tier"],

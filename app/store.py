@@ -325,21 +325,17 @@ def create_template(name: str, body: str, category: str | None, keywords: list, 
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
-            "INSERT INTO templates (name, body, category, keywords, auto_use) VALUES (%s, %s, %s, %s, %s) "
-            "RETURNING id, name, body, category, keywords, auto_use",
+            "INSERT INTO templates (name, body, category, keywords, auto_use) VALUES (%s, %s, %s, %s, %s) RETURNING id, name, body, category, keywords, auto_use",
             (name, body, category, Jsonb(keywords or []), auto_use),
         )
         return cur.fetchone()
 
 
-def update_template(
-    template_id: int, name: str, body: str, category: str | None, keywords: list, auto_use: bool
-) -> dict | None:
+def update_template(template_id: int, name: str, body: str, category: str | None, keywords: list, auto_use: bool) -> dict | None:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
-            "UPDATE templates SET name = %s, body = %s, category = %s, keywords = %s, auto_use = %s WHERE id = %s "
-            "RETURNING id, name, body, category, keywords, auto_use",
+            "UPDATE templates SET name = %s, body = %s, category = %s, keywords = %s, auto_use = %s WHERE id = %s RETURNING id, name, body, category, keywords, auto_use",
             (name, body, category, Jsonb(keywords or []), auto_use, template_id),
         )
         return cur.fetchone()
@@ -357,9 +353,7 @@ def merge_tickets(duplicate_id: str, primary_id: str) -> bool:
         return False
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute(
-            "SELECT ticket_id, merged_into FROM tickets WHERE ticket_id IN (%s, %s)", (duplicate_id, primary_id)
-        )
+        cur.execute("SELECT ticket_id, merged_into FROM tickets WHERE ticket_id IN (%s, %s)", (duplicate_id, primary_id))
         found = {r["ticket_id"]: r for r in cur.fetchall()}
         if duplicate_id not in found or primary_id not in found:
             return False
@@ -400,9 +394,7 @@ def add_attachment(ticket_id: str, filename: str, content_type: str, data: bytes
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
-            "INSERT INTO attachments (ticket_id, filename, content_type, size, data) "
-            "VALUES (%s, %s, %s, %s, %s) "
-            "RETURNING id, ticket_id, filename, content_type, size, created_at",
+            "INSERT INTO attachments (ticket_id, filename, content_type, size, data) VALUES (%s, %s, %s, %s, %s) RETURNING id, ticket_id, filename, content_type, size, created_at",
             (ticket_id, filename, content_type, len(data), data),
         )
         return cur.fetchone()
@@ -413,8 +405,7 @@ def list_attachments(ticket_id: str) -> list[dict]:
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
-            "SELECT id, filename, content_type, size, created_at FROM attachments "
-            "WHERE ticket_id = %s ORDER BY created_at",
+            "SELECT id, filename, content_type, size, created_at FROM attachments WHERE ticket_id = %s ORDER BY created_at",
             (ticket_id,),
         )
         return cur.fetchall()

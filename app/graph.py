@@ -1,38 +1,45 @@
-from app.state import State, public_messages, grounded_confidence, confidence_threshold
-from langgraph.graph import StateGraph, START, END
-from app.intake import normalize
 import json
 import re
-from app import router
-from app.kb import search
 import warnings
+
+from langgraph.graph import END, START, StateGraph
+
+from app import router
+from app.audit import verify
+from app.intake import normalize
+from app.kb import search
 from app.pii import scan
 from app.roster import assign
-from app.audit import verify
+from app.state import State, confidence_threshold, grounded_confidence, public_messages
+
 warnings.filterwarnings("ignore")
 
+
 def _parse_json(raw: str) -> dict:
-    #small LLMs wrap JSON in markdown fences or add prose; grab the first {...} block and parse that
+    # small LLMs wrap JSON in markdown fences or add prose; grab the first {...} block and parse that
     start, end = raw.find("{"), raw.rfind("}")
     if start == -1 or end == -1:
         raise ValueError(f"no JSON object in model output: {raw!r}")
-    return json.loads(raw[start:end+1])
+    return json.loads(raw[start : end + 1])
 
-#building the worker functions
-def intake(state:State) -> dict:
+
+# building the worker functions
+def intake(state: State) -> dict:
     try:
-        ticket=normalize(state["raw_input"])
+        ticket = normalize(state["raw_input"])
     except Exception as e:
-        return {"error": str(e), "audit" : ["intake rejected: malformed"]}
-    #print("intake ran")
-    return {"ticket": ticket, "error": None, "audit":["intake done"]}
+        return {"error": str(e), "audit": ["intake rejected: malformed"]}
+    # print("intake ran")
+    return {"ticket": ticket, "error": None, "audit": ["intake done"]}
+
 
 def after_intake(state: State) -> str:
     return "decide" if state.get("error") else "classify"
 
-def classify(state:State) -> dict:
+
+def classify(state: State) -> dict:
     t = state["ticket"]
-    prompt=f"""Classify this support ticket. Choose the best label in each group using the definitions.
+    prompt = f"""Classify this support ticket. Choose the best label in each group using the definitions.
 
     category: one of [billing,technical,account,general,shipping,refund,feature_request,complaint]
       billing = charges, invoices, payment methods, pricing disputes
@@ -66,14 +73,15 @@ def classify(state:State) -> dict:
     Body: {t.body}
     """
     raw = router.think(prompt)
-    data=_parse_json(raw)
+    data = _parse_json(raw)
     data = {k: (v.lower() if isinstance(v, str) else v) for k, v in data.items()}
-    #print("RAW CLASSIFY:",raw)
-    #print("classify ran")
-    return {"classification": data, "audit":["classify done"]}
+    # print("RAW CLASSIFY:",raw)
+    # print("classify ran")
+    return {"classification": data, "audit": ["classify done"]}
 
-def auto_tags(c:dict) -> list[str]:
-    tags=[]
+
+def auto_tags(c: dict) -> list[str]:
+    tags = []
     category = (c.get("category") or "").lower()
     priority = (c.get("priority") or "").lower()
     sentiment = (c.get("sentiment") or "").lower()
@@ -84,7 +92,8 @@ def auto_tags(c:dict) -> list[str]:
         tags.append(priority)
     if sentiment == "negative":
         tags.append("unhappy")
-    return tags 
+    return tags
+
 
 def score_difficulty(state: State) -> dict:
     t = state["ticket"]
@@ -103,15 +112,16 @@ def score_difficulty(state: State) -> dict:
     data["level"] = data.get("level", "simple").lower()
     return {"difficulty": data, "audit": ["score_difficulty done"]}
 
+
 def detect_sensitivity(state: State) -> dict:
     t = state["ticket"]
     c = state["classification"]
 
-    #1 deterministic: regex PII + senstitive category ( free,always runs but matches against known expression patterns)
+    # 1 deterministic: regex PII + senstitive category ( free,always runs but matches against known expression patterns)
     pii = scan(f"{t.subject} {t.body}")
     category_hit = c["category"] in {"refund", "billing", "account"}
-    
-    # 2 model judgement: catches contextual sensitivity that the regex misses 
+
+    # 2 model judgement: catches contextual sensitivity that the regex misses
     sensitive_info = """
     - Financial account data: bank account or routing
     numbers, full card numbers, tax IDs, salary or income figures
@@ -142,11 +152,11 @@ def detect_sensitivity(state: State) -> dict:
         llm = _parse_json(router.think(prompt))
         llm_sensitive = bool(llm.get("sensitive"))
     except Exception:
-        llm, llm_sensitive = {}, False #parse failed; regex + category still guard
-    
+        llm, llm_sensitive = {}, False  # parse failed; regex + category still guard
+
     is_sensitive = bool(pii) or category_hit or llm_sensitive
 
-    reasons =[]
+    reasons = []
     if pii:
         reasons.append("PII found:" + ", ".join(pii))
     if category_hit:
@@ -154,47 +164,43 @@ def detect_sensitivity(state: State) -> dict:
     if llm_sensitive:
         types = llm.get("types") or []
         if isinstance(types, str):
-            types=[types]
+            types = [types]
         reasons.append(f"model flagged: {', '.join(types) or 'unspecified'}")
 
+    sensitivity = {"is_sensitive": is_sensitive, "pii_types": pii, "reason": "; ".join(reasons) or "none"}
+    return {"sensitivity": sensitivity, "audit": ["detect_sensitivity done"]}
 
-    sensitivity = {
-        "is_sensitive": is_sensitive,
-        "pii_types": pii,
-        "reason": "; ".join(reasons) or "none"
-        }
-    return {"sensitivity": sensitivity,"audit": ["detect_sensitivity done"]}
 
-def route(state:State) -> dict:
+def route(state: State) -> dict:
     s = state["sensitivity"]
     lane = "private" if s["is_sensitive"] else "cloud"
     level = state["difficulty"]["level"]
-    model = router.intended_model(lane,level)
+    model = router.intended_model(lane, level)
     routing = {"lane": lane, "tier": level, "model": model}
-    #print("route ran")
-    return {"routing":routing, "audit":["route done"]}
+    # print("route ran")
+    return {"routing": routing, "audit": ["route done"]}
 
-def retrieve(state:State) -> dict:
+
+def retrieve(state: State) -> dict:
     t = state["ticket"]
     hits = search(f"{t.subject} {t.body}")
-    #print("RETRIEVED:",[h["title"] for h in hits])
-    #print("retrieve ran")
-    return {"retrieval":hits, "audit":["retrieve done"]}
+    # print("RETRIEVED:",[h["title"] for h in hits])
+    # print("retrieve ran")
+    return {"retrieval": hits, "audit": ["retrieve done"]}
 
-def generate(state:State) -> dict:
-    t= state["ticket"]
+
+def generate(state: State) -> dict:
+    t = state["ticket"]
     c = state["classification"]
     hits = state["retrieval"]
     kb_text = "\n\n".join(f"[{h['title']}]\n{h['content']}" for h in hits)
 
     history = public_messages(state.get("messages", []))
-    convo = "\n".join(
-        f"{'Customer' if m['role'] == 'customer' else 'Support'}:{m['body']}" for m in history
-    )
+    convo = "\n".join(f"{'Customer' if m['role'] == 'customer' else 'Support'}:{m['body']}" for m in history)
 
     greeting = f"Hi {t.customer_name.split()[0]}," if t.customer_name else "Hi there!"
 
-    prompt=f"""
+    prompt = f"""
     You are a customer support agent representing a company's support team. Write a helpful, polite reply to this problem.
     Classification: 
         Category: {c["category"]}
@@ -226,18 +232,18 @@ def generate(state:State) -> dict:
     """
 
     r = state["routing"]
-    reply = router.generate_reply(prompt, r['lane'], r['tier'])
-    #print("DRAFT:",reply)
-    #print("generate ran")
-    lines = reply.strip().split("\n",1)
+    reply = router.generate_reply(prompt, r["lane"], r["tier"])
+    # print("DRAFT:",reply)
+    # print("generate ran")
+    lines = reply.strip().split("\n", 1)
     confidence = None
     first = lines[0].strip()
     if first.lower().startswith("kind:"):
-        head = first.split(":",1)[1].strip()          # e.g. "answer CONFIDENCE: 85" or just "answer"
+        head = first.split(":", 1)[1].strip()  # e.g. "answer CONFIDENCE: 85" or just "answer"
         m = re.search(r"confidence[:=]?\s*(\d{1,3})", head, re.I)
         if m:
             confidence = min(100, int(m.group(1)))
-            head = head[:m.start()].strip()            # strip the confidence tail off the kind word
+            head = head[: m.start()].strip()  # strip the confidence tail off the kind word
         kind = head.split()[0].lower() if head else "answer"
         reply = lines[1].strip() if len(lines) > 1 else ""
     else:
@@ -245,24 +251,23 @@ def generate(state:State) -> dict:
     if kind == "escalate":
         reply = ""
 
-    return {"draft":{"reply":reply,"kind":kind,"confidence":confidence},"audit":["generate done"]}
+    return {"draft": {"reply": reply, "kind": kind, "confidence": confidence}, "audit": ["generate done"]}
 
-def review(state:State) -> dict:
+
+def review(state: State) -> dict:
     draft = state["draft"]["reply"]
 
     if not draft.strip():
-        return {"compliance": {"verdict": "pass", "issues": []},
-                "review_count": state.get("review_count", 0),
-                "audit": ["review skipped (no draft)"]}
-    
+        return {"compliance": {"verdict": "pass", "issues": []}, "review_count": state.get("review_count", 0), "audit": ["review skipped (no draft)"]}
+
     issues = []
-    
+
     # deterministic checks (free, always correct)
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft):
         issues.append("contains an unfilled placeholder in square brackets")
     if "The Support Team" not in draft:
         issues.append("missing the 'The Support Team' sign-off")
-    #data-privacy :an outbound reply must not carry PII (echoed sensitive data, or another customer's data leaked in)
+    # data-privacy :an outbound reply must not carry PII (echoed sensitive data, or another customer's data leaked in)
     leaked = scan(draft)
     if leaked:
         issues.append("reply exposes PII: " + ", ".join(leaked))
@@ -295,12 +300,14 @@ def review(state:State) -> dict:
     count = state.get("review_count", 0) + 1
     return {"compliance": {"verdict": verdict, "issues": issues}, "review_count": count, "audit": ["review done"]}
 
+
 def after_review(state: State) -> str:
-    #on a clear compliance fail, loop back to generate ONCE (review_count caps it), else move on
+    # on a clear compliance fail, loop back to generate ONCE (review_count caps it), else move on
     failed = state["compliance"]["verdict"] == "fail"
     return "generate" if failed and state["review_count"] < 2 else "decide"
 
-def decide(state:State) -> dict:
+
+def decide(state: State) -> dict:
     err = state.get("error")
     if err:
         decision = {"action": "escalate", "reason": "malformed intake"}
@@ -328,59 +335,62 @@ def decide(state:State) -> dict:
             decision = {"action": "auto_send", "reason": "requesting more information"}
         else:
             decision = {"action": "escalate", "reason": "no usable draft"}
-    #print("DECISION:", decision)
-    #print("decide ran")
+    # print("DECISION:", decision)
+    # print("decide ran")
     if not err and decision["action"] == "escalate":
         decision["assignee"] = assign(c["priority"], state["ticket"].ticket_id)
-    return {"decision":decision,"audit":["decide done"]}
+    return {"decision": decision, "audit": ["decide done"]}
+
 
 def learn(state: State) -> dict:
     # KB write-back is deferred to the /resolve action; one auto_send is not a resolved conversation
     return {"learned": False, "audit": ["learn: deferred to resolve"]}
 
-#building the graph
+
+# building the graph
 builder = StateGraph(State)
 
-#register each worker under a name
-builder.add_node("intake",intake)
-builder.add_node("classify",classify)
+# register each worker under a name
+builder.add_node("intake", intake)
+builder.add_node("classify", classify)
 builder.add_node("score_difficulty", score_difficulty)
-builder.add_node("detect_sensitivity",detect_sensitivity)
-builder.add_node("route",route)
-builder.add_node("retrieve",retrieve)
-builder.add_node("generate",generate)
-builder.add_node("review",review)
-builder.add_node("decide",decide)
-builder.add_node("learn",learn)
+builder.add_node("detect_sensitivity", detect_sensitivity)
+builder.add_node("route", route)
+builder.add_node("retrieve", retrieve)
+builder.add_node("generate", generate)
+builder.add_node("review", review)
+builder.add_node("decide", decide)
+builder.add_node("learn", learn)
 
-#drawing the arrws: Start -> intake ->.... -> decide -> END
-builder.add_edge(START,"intake")
+# drawing the arrws: Start -> intake ->.... -> decide -> END
+builder.add_edge(START, "intake")
 builder.add_conditional_edges(
     "intake",
     after_intake,
-    {"classify": "classify","decide":"decide" },
+    {"classify": "classify", "decide": "decide"},
 )
-builder.add_edge("classify","detect_sensitivity")
-builder.add_edge("detect_sensitivity","score_difficulty")
-builder.add_edge("score_difficulty","route")
-builder.add_edge("route","retrieve")
-builder.add_edge("retrieve","generate")
-builder.add_edge("generate","review")
+builder.add_edge("classify", "detect_sensitivity")
+builder.add_edge("detect_sensitivity", "score_difficulty")
+builder.add_edge("score_difficulty", "route")
+builder.add_edge("route", "retrieve")
+builder.add_edge("retrieve", "generate")
+builder.add_edge("generate", "review")
 builder.add_conditional_edges(
     "review",
     after_review,
-    {"generate":"generate","decide":"decide"},
+    {"generate": "generate", "decide": "decide"},
 )
-builder.add_edge("decide","learn")
-builder.add_edge("learn",END)
+builder.add_edge("decide", "learn")
+builder.add_edge("learn", END)
 
-#freeze the builder into a runnable graph
+# freeze the builder into a runnable graph
 graph = builder.compile()
 
+
 def print_result(final: dict) -> None:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TICKET")
-    print("="*60)
+    print("=" * 60)
     print(f"  Subject : {final['ticket'].subject}")
     print(f"  Body    : {final['ticket'].body}")
 
@@ -412,9 +422,9 @@ def print_result(final: dict) -> None:
         print(f"  - {h['source']} {h['title']} ({h['score']}% relevant)")
 
     print("\nDRAFT REPLY")
-    print("-"*60)
+    print("-" * 60)
     print(final["draft"]["reply"].strip())
-    print("="*60)
+    print("=" * 60)
 
     comp = final["compliance"]
     print("\nCOMPLIANCE")
@@ -443,17 +453,17 @@ def print_result(final: dict) -> None:
     print(f" Chain:{'intact' if broken < 0 else f'BROKEN at step {broken}'}")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     initial_state = {
         "raw_input": {"source": "email", "subject": "Cannot log in", "body": "reset link is broken"},
         "audit": [],
     }
 
-    final_state=graph.invoke(initial_state)
+    final_state = graph.invoke(initial_state)
 
     print_result(final_state)
 
-    #print("classification:", final_state["classification"])
-    #print("ticket:",final_state["ticket"])
-    #print("---")
-    print("audit log:",final_state["audit"])
+    # print("classification:", final_state["classification"])
+    # print("ticket:",final_state["ticket"])
+    # print("---")
+    print("audit log:", final_state["audit"])

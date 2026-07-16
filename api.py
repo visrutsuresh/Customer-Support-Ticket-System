@@ -94,9 +94,7 @@ def _process(ticket_id: str, raw: dict):
 
 
 def _reprocess(ticket_id: str, latest: str):
-    prior = store.get(
-        ticket_id
-    )  # has the just appended customer turn + original ticket info
+    prior = store.get(ticket_id)  # has the just appended customer turn + original ticket info
     t = prior["ticket"]
     raw = {
         "ticket_id": ticket_id,
@@ -184,9 +182,7 @@ class ReplyIn(BaseModel):
 def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
-    store.append_message(
-        ticket_id, "customer", payload.body
-    )  # message thread grows & lifecycle -> open
+    store.append_message(ticket_id, "customer", payload.body)  # message thread grows & lifecycle -> open
     background.add_task(_reprocess, ticket_id, payload.body)
     return {"ticket_id": ticket_id, "status": "processing"}
 
@@ -215,9 +211,7 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None):
     # write-back the resolution we actually sent (last agent turn), quality-gated
     ticket = Ticket(**state["ticket"])
     agent_msgs = [m["body"] for m in state.get("messages", []) if m["role"] == "agent"]
-    resolution = (
-        agent_msgs[-1] if agent_msgs else (state.get("draft") or {}).get("reply", "")
-    )
+    resolution = agent_msgs[-1] if agent_msgs else (state.get("draft") or {}).get("reply", "")
     out = learn_agent(ticket, resolution, resolved=True)
     return {
         "ticket_id": ticket_id,
@@ -283,9 +277,7 @@ def list_templates():
 
 @app.post("/templates")
 def add_template(payload: TemplateIn):
-    return store.create_template(
-        payload.name, payload.body, payload.category, payload.keywords, payload.auto_use
-    )
+    return store.create_template(payload.name, payload.body, payload.category, payload.keywords, payload.auto_use)
 
 
 @app.get("/templates/{template_id}")
@@ -329,9 +321,7 @@ def apply_template(ticket_id: str, payload: ApplyTemplateIn):
     tpl = store.get_template(payload.template_id)
     if tpl is None:
         raise HTTPException(status_code=404, detail="template not found")
-    store.edit_reply(
-        ticket_id, tpl["body"]
-    )  # overwrite the draft with the template; marks the ticket 'edited'
+    store.edit_reply(ticket_id, tpl["body"])  # overwrite the draft with the template; marks the ticket 'edited'
     return {
         "ticket_id": ticket_id,
         "applied_template": tpl["name"],
@@ -360,9 +350,7 @@ class LinkIn(BaseModel):
 @app.post("/tickets/{ticket_id}/link")
 def link_ticket(ticket_id: str, payload: LinkIn):
     if not store.link_tickets(ticket_id, payload.other_id):
-        raise HTTPException(
-            status_code=400, detail="link failed: both ids must exist and differ"
-        )
+        raise HTTPException(status_code=400, detail="link failed: both ids must exist and differ")
     return {"linked": sorted([ticket_id, payload.other_id])}
 
 
@@ -383,9 +371,7 @@ async def upload_attachment(ticket_id: str, file: UploadFile = File(...)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     if file.content_type not in ALLOWED_ATTACHMENT_TYPES:
-        raise HTTPException(
-            status_code=400, detail=f"unsupported type: {file.content_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"unsupported type: {file.content_type}")
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="empty file")
