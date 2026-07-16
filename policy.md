@@ -48,5 +48,5 @@ A draft reply PASSES only if it obeys every rule below. If it breaks any single 
 
 ## 8. Format and identification
 29. No unfilled placeholders such as [YOUR NAME] or [ORDER ID].
-30. Open with a greeting and sign off as "The Support Team".
+30. Open with a greeting and sign off as "The Nimbus Support Team".
 31. Keep the reply focused on the customer's issue; no unrelated marketing or upselling.

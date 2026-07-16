@@ -228,7 +228,7 @@ def generate(state: State) -> dict:
     Do not escalate just because the ticket is important or the customer is upset; if the KB answers it, answer it. Prefer "KIND: question" over "KIND: escalate" whenever the only thing missing is a detail the customer can provide (an order number, which charge, the exact error message). Put the actual reply on the lines after that control line (for escalate, no reply is needed).
     On that same control line, after the KIND word, add "CONFIDENCE: N" where N is 0-100 = how sure you are the answer is correct AND complete from the knowledge base above (be honest; partial coverage = lower). Example: "KIND: answer CONFIDENCE: 85".
 
-    Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Support Team'. Sound helpful and warm.
+    Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Nimbus Support Team'. Sound helpful and warm.
     """
 
     r = state["routing"]
@@ -265,8 +265,8 @@ def review(state: State) -> dict:
     # deterministic checks (free, always correct)
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft):
         issues.append("contains an unfilled placeholder in square brackets")
-    if "The Support Team" not in draft:
-        issues.append("missing the 'The Support Team' sign-off")
+    if "Support Team" not in draft:
+        issues.append("missing the Nimbus Support Team sign-off")
     # data-privacy :an outbound reply must not carry PII (echoed sensitive data, or another customer's data leaked in)
     leaked = scan(draft)
     if leaked:
@@ -338,7 +338,7 @@ def decide(state: State) -> dict:
     # print("DECISION:", decision)
     # print("decide ran")
     if not err and decision["action"] == "escalate":
-        decision["assignee"] = assign(c["priority"], state["ticket"].ticket_id)
+        decision["assignee"] = assign(c.get("category"), c["priority"], state["ticket"].ticket_id)
     return {"decision": decision, "audit": ["decide done"]}
 
 

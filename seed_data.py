@@ -95,11 +95,8 @@ BENCH = [
         signup_days_ago=400,
         charges=[charge(19.99, "Pro plan monthly", 20)],
         past_tickets=[
-            {
-                "subject": "Refund request",
-                "body": "Cancelled and want a refund.",
-                "resolution": "Refund requested, pending review.",
-            }
+            {"subject": "Refund request", "body": "Cancelled and want a refund.", "category": "refund",
+             "priority": "high", "resolution": "Refund requested, pending review.", "csat": 6}
         ],
     ),  # "still no refund" -> in progress
     customer(
@@ -116,7 +113,8 @@ BENCH = [
         "grace.hall@example.com",
         "pro",
         signup_days_ago=500,
-        past_tickets=[{"subject": "App crash", "body": "App crashed on launch.", "resolution": "Advised reinstall; monitoring."}],
+        past_tickets=[{"subject": "App crash", "body": "App crashed on launch.", "category": "technical",
+                       "priority": "medium", "resolution": "Advised reinstall; monitoring.", "csat": 7}],
     ),  # crashing ticket
     customer(
         "Hana Sato",
@@ -150,8 +148,23 @@ BENCH = [
 ]
 
 
+# realistic past tickets, drawn on by the background cast; each is internally coherent
+# (subject <-> category <-> priority <-> resolution <-> csat) so history makes sense
+PAST_TICKET_POOL = [
+    {"subject": "Unexpected charge on my card", "body": "I saw a charge I did not recognise.", "category": "billing", "priority": "medium", "resolution": "Explained the charge and confirmed it was a valid subscription renewal.", "csat": 8},
+    {"subject": "App would not open after an update", "body": "The app crashed on launch after updating.", "category": "technical", "priority": "medium", "resolution": "Walked the customer through a reinstall, which cleared the crash.", "csat": 7},
+    {"subject": "Package arrived damaged", "body": "My order turned up with a cracked case.", "category": "shipping", "priority": "high", "resolution": "Arranged a free replacement shipment.", "csat": 9},
+    {"subject": "Locked out of my account", "body": "I could not sign in after too many attempts.", "category": "account", "priority": "high", "resolution": "Verified identity and restored access.", "csat": 8},
+    {"subject": "Refund for a cancelled order", "body": "I cancelled and wanted my money back.", "category": "refund", "priority": "medium", "resolution": "Processed the refund within the 30-day window.", "csat": 9},
+    {"subject": "How do I change my plan", "body": "I wanted to move from Pro to Max.", "category": "billing", "priority": "low", "resolution": "Explained the upgrade steps and prorated billing.", "csat": 8},
+    {"subject": "Tracking had not updated", "body": "My parcel tracking was stuck for days.", "category": "shipping", "priority": "medium", "resolution": "Opened a carrier investigation; the parcel was located and delivered.", "csat": 7},
+    {"subject": "Needed to update my email", "body": "I wanted to change my account email.", "category": "account", "priority": "low", "resolution": "Guided the customer through the email change and confirmation.", "csat": 9},
+]
+
+
 def _background(n):
     out = []
+    next_order = 20000  # sequential ids so background orders never collide (birthday-clash with random ids)
     for _ in range(n):
         name = fake.name()
         email = fake.unique.email()
@@ -169,7 +182,7 @@ def _background(n):
             tracking = fake.bothify("1Z####??####") if status != "processing" else None
             orders.append(
                 order(
-                    str(random.randint(20000, 99999)),
+                    str(next_order),
                     random.choice(ITEMS),
                     round(random.uniform(15, 200), 2),
                     status,
@@ -177,10 +190,9 @@ def _background(n):
                     tracking,
                 )
             )
+            next_order += 1
 
-        past = []
-        if random.random() < 0.3:
-            past = [{"subject": "Previous question", "body": "Had an issue before.", "resolution": "Resolved by support."}]
+        past = random.sample(PAST_TICKET_POOL, random.randint(0, 2))
 
         out.append(customer(name, email, plan, signup_days_ago=signup, orders=orders, charges=charges, past_tickets=past))
     return out

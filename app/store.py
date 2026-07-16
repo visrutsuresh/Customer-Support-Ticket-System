@@ -433,21 +433,31 @@ def past_tickets(email: str) -> list[dict]:
 
 
 def seed_history(customers) -> None:
-    # a few resolved tickets per customer so past_tickets has data; deterministic ids, never touches real tickets
+    # resolved tickets per customer so past_tickets has data; deterministic ids, never touches real tickets
     from datetime import datetime
+
+    from app.roster import assign
 
     when = datetime(2026, 6, 15)
     with _connect() as conn:
+        conn.execute("DELETE FROM tickets WHERE ticket_id LIKE 'HIST-%'")  # clear old HIST, leave real tickets alone
         for c in customers:
             for i, pt in enumerate(c.get("past_tickets", [])):
+                tid = f"HIST-{c['email']}-{i}"
+                category = pt.get("category", "general")
+                priority = pt.get("priority", "medium")
+                escalated = priority in ("high", "critical")
+                action = "escalate" if escalated else "auto_send"
+                assignee = assign(category, priority, tid)["name"] if escalated else None
                 state = {
                     "ticket": {"subject": pt["subject"], "body": pt["body"], "source": "email", "customer_name": c["name"], "customer_email": c["email"]},
+                    "classification": {"category": category, "priority": priority},
                     "messages": [{"role": "customer", "body": pt["body"]}, {"role": "agent", "body": pt["resolution"]}],
                     "resolution": pt["resolution"],
                 }
                 conn.execute(
-                    """INSERT INTO tickets (ticket_id, subject, human_status, lifecycle, created_at, state)
-                       VALUES (%s, %s, 'approved', 'resolved', %s, %s)
-                       ON CONFLICT (ticket_id) DO NOTHING""",
-                    (f"HIST-{c['email']}-{i}", pt["subject"], when, Jsonb(state)),
+                    """INSERT INTO tickets
+                         (ticket_id, subject, category, priority, action, assignee, human_status, lifecycle, created_at, state, csat)
+                       VALUES (%s, %s, %s, %s, %s, %s, 'approved', 'resolved', %s, %s, %s)""",
+                    (tid, pt["subject"], category, priority, action, assignee, when, Jsonb(state), pt.get("csat")),
                 )

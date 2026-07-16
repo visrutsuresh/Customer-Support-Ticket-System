@@ -97,33 +97,45 @@ def retrieve_agent(ticket, lane="private", level="complex") -> list:
 
 
 GENERATE_SYSTEM = """
-You are the Response Generation agent for customer support.
+You are the Response Generation agent for Nimbus customer support.
 Decide how to handle this ticket, gathering any context you need first.
-You MAY look the customer up to personalize the reply.
-You are shown the knowledge-base articles our retrieval already found for this ticket (in the context below). Read them before you decide.
+You are shown the knowledge-base articles our retrieval already found (in the context below). Read them before you decide.
 
-Tool available:
-  crm_lookup(email) -> customer record (tier, orders) or null
+Tools available (call the ones you need before deciding):
+  crm_lookup(email)            -> customer record (tier, plan, account status) or null
+  order_lookup(order_id)       -> one order by its id (status, tracking)
+  orders_by_email(email)       -> all of this customer's orders (use when no order id was given)
+  billing_history(email)       -> this customer's charges
+  subscription_details(email)  -> plan and subscription status
+  account_status(email)        -> account state and tier
+  past_tickets(email)          -> this customer's earlier resolved tickets
+  service_status()             -> current known incidents or outages
+  refund_eligibility(email)    -> whether a refund is within the 30-day window
+  request_refund(order_id)     -> prepare a refund for a human to approve (use only after checking eligibility)
+  cancel_subscription(email)   -> start a cancellation; it returns a code the customer must reply with to confirm
 Do not repeat a tool call you already made. Once you have what you need, finish.
 
-Before you escalate, use the context you already have: call crm_lookup on the customer, and read the conversation and knowledge-base articles in the context above. Escalate only if, even with all of that, you still cannot help.
+Use these tools to ANSWER instead of escalating: look up the order, charge, or account and tell the customer what you find.
+Before you escalate, gather context with the tools and read the conversation and KB articles. Escalate only if, even then, you still cannot help.
+To act on money or a subscription, call request_refund or cancel_subscription, then answer telling the customer it has been submitted for processing.
+If the customer replied with a confirmation code, call cancel_subscription again with that code to confirm.
 
 Choose one outcome:
-  answer   - the retrieved articles cover the ticket; we can reply helpfully. PREFER THIS whenever the articles are enough to help.
-  question - a key detail is missing; we must ask the customer for exactly that. PREFER THIS over escalate whenever the only thing missing is something the customer can give you (an order number, which charge, the exact error).
-  escalate - ONLY if the retrieved articles clearly do NOT cover this AND a human is genuinely required. Do not escalate just because the ticket is important, urgent, or the customer is upset. If the KB answers it, answer it.
+  answer   - we can reply helpfully (from the KB, the tools, or both). PREFER THIS whenever you have enough to help.
+  question - a key detail is missing; ask the customer for exactly that. PREFER THIS over escalate when the missing thing is something the customer can give you.
+  escalate - ONLY if you genuinely cannot help and a human is required. Not just because the ticket is important or the customer is upset.
 
 Reply every turn with ONE JSON object, nothing else.
-  To use the tool: {"thought":"...","action":"crm_lookup","args":{"email":"<email>"}}
-  To finish:       {"thought":"...","action":"finish","result":{"kind":"answer|question|escalate","confidence":<0-100>,"notes":"<what to say, what is missing, or why escalate>"}}
-confidence = 0-100, how sure you are the answer is correct AND complete from the retrieved articles. Only meaningful for kind=answer. Be honest: if the articles only partly cover it, score lower.
+  To use a tool: {"thought":"...","action":"<tool>","args":{...}}
+  To finish:     {"thought":"...","action":"finish","result":{"kind":"answer|question|escalate","confidence":<0-100>,"notes":"<what to say, including any facts you found; or what is missing; or why escalate>"}}
+confidence = 0-100, how sure you are the answer is correct AND complete. Be honest.
 """
 
 
 def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str:
     kb_text = "\n\n".join(f"[{a['title']}]\n{a['content']}" for a in articles)
     greeting = f"Hi {ticket.customer_name.split()[0]}," if ticket.customer_name else "Hi there,"
-    cust = f"tier={customer['tier']}, orders={customer['orders']}" if customer else "no customer record found"
+    cust = f"tier={customer['tier']}, plan={customer['plan']}" if customer else "no customer record found"
     prompt = f"""
     You are a warm, helpful customer support agent. Write a reply to this ticket.
     Customer: {cust}
@@ -133,9 +145,9 @@ def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str
     Conversation so far (oldest first):
     {convo}
     The last line above is the customer's latest message. Reply to that, using the earlier turns for context. Do not repeat a solution you already gave, and do not contradict an earlier reply.
-    Use ONLY these knowledge base articles, do not invent details:
+    Use the guidance from triage above and these knowledge base articles. Do not invent details beyond what they contain:
     {kb_text}
-    Open with exactly "{greeting}" and sign off as 'The Support Team'. No placeholders like [NAME.
+    Open with exactly "{greeting}" and sign off as 'The Nimbus Support Team'. No placeholders like [NAME.
     """
     return router.generate_reply(prompt, lane, tier)
 
@@ -149,23 +161,32 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None)
         f"Conversation so far (oldest first):\n{convo}\n"
         f"Knowledge-base articles retrieved for this ticket:\n{kb_preview}"
     )
-    transcript, customer = "", None
+    transcript, customer, proposed = "", None, None
     for _ in range(MAX_STEPS):
         move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}\nYour JSON:", max_new_tokens=512))
-        if move.get("action") == "finish":
+        action = move.get("action")
+        if action == "finish":
             r = move["result"]
             kind = r.get("kind", "escalate")
             conf = r.get("confidence")
             if kind == "escalate":
-                return {"kind": "escalate", "reply": "", "confidence": conf}
+                return {"kind": "escalate", "reply": "", "confidence": conf, "proposed_action": proposed}
             reply = _write_reply(ticket, articles, customer, r.get("notes", ""), lane, tier, convo)
-            return {"kind": kind, "reply": reply.strip(), "confidence": conf}
-        if move.get("action") == "crm_lookup":
+            return {"kind": kind, "reply": reply.strip(), "confidence": conf, "proposed_action": proposed}
+        if action == "crm_lookup":
             customer = tools.crm_lookup(**move.get("args", {}))
             transcript += f"\ncrm_lookup -> {customer}"
+        elif action in tools.TOOLS:
+            args = dict(move.get("args", {}))
+            if action == "cancel_subscription":
+                args["ticket_id"] = ticket.ticket_id  # injected; the model never provides it
+            obs = tools.run_tool(action, args)
+            transcript += f"\n{action}({move.get('args', {})}) -> {obs}"
+            if action in ("request_refund", "cancel_subscription"):
+                proposed = {"tool": action, "args": move.get("args", {}), "result": obs}
         else:
-            transcript += f"\nunknown action {move.get('action')!r}"
-    return {"kind": "escalate", "reply": "", "confidence": None}  # fallback: never decided
+            transcript += f"\nunknown action {action!r}"
+    return {"kind": "escalate", "reply": "", "confidence": None, "proposed_action": proposed}  # fallback: never decided
 
 
 REVIEW_SYSTEM = """
@@ -173,11 +194,13 @@ You are the Compliance and Quality Review agent for customer support.
 Check the draft reply against the policy rules AND for factual accuracy.
 You MAY look the customer up to verify any claim the reply makes about their account or orders.
 
-Tool available:
-  crm_lookup(email) -> customer record (tier, orders) or null
+Tools available for fact-checking:
+  crm_lookup(email)        -> customer record (tier, plan, account status) or null
+  order_lookup(order_id)   -> an order's status and tracking
+  billing_history(email)   -> the customer's charges
 
 Reply every turn with ONE JSON object, nothing else.
-  To use the tool: {"thought":"...","action":"crm_lookup","args":{"email":"<email>"}}
+  To use a tool: {"thought":"...","action":"<tool>","args":{...}}
   To finish:       {"thought":"...","action":"finish","result":{"verdict":"pass|fail","issues":["<reason>", ...]}}
 FAIL if the reply breaks a policy rule, or states something about the customer's account/orders
 that the CRM contradicts. Asking the customer for information is allowed and PASSES. When unsure, PASS.
@@ -189,8 +212,8 @@ def review_agent(ticket, draft_reply, lane="private", level="complex") -> dict:
     issues = []
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft_reply):
         issues.append("contains an unfilled placeholder in square brackets")
-    if "The Support Team" not in draft_reply:
-        issues.append("missing the 'The Support Team' sign-off")
+    if "Support Team" not in draft_reply:
+        issues.append("missing the Nimbus Support Team sign-off")
     leaked = scan(draft_reply)
     if leaked:
         issues.append("reply exposes PII: " + ", ".join(leaked))
@@ -207,10 +230,11 @@ def review_agent(ticket, draft_reply, lane="private", level="complex") -> dict:
             if move["result"].get("verdict") == "fail":
                 issues.extend(move["result"].get("issues", []))
             break
-        if move.get("action") == "crm_lookup":
-            transcript += f"\ncrm_lookup -> {tools.crm_lookup(**move.get('args', {}))}"
+        action = move.get("action")
+        if action in ("crm_lookup", "order_lookup", "billing_history"):
+            transcript += f"\n{action} -> {tools.run_tool(action, move.get('args', {}))}"
         else:
-            transcript += f"\nunknown action {move.get('action')!r}"
+            transcript += f"\nunknown action {action!r}"
 
     return {"verdict": "fail" if issues else "pass", "issues": issues}
 
