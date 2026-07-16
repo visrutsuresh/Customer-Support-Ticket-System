@@ -417,3 +417,37 @@ def get_attachment(attachment_id: int) -> dict | None:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute("SELECT filename, content_type, data FROM attachments WHERE id = %s", (attachment_id,))
         return cur.fetchone()
+
+
+def past_tickets(email: str) -> list[dict]:
+    # this customer's resolved history, read from the tickets table by email
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            """SELECT subject, state FROM tickets
+               WHERE state -> 'ticket' ->> 'customer_email' = %s AND lifecycle = 'resolved'
+               ORDER BY created_at DESC""",
+            (email,),
+        )
+        return [{"subject": r["subject"], "resolution": (r["state"] or {}).get("resolution", "")} for r in cur.fetchall()]
+
+
+def seed_history(customers) -> None:
+    # a few resolved tickets per customer so past_tickets has data; deterministic ids, never touches real tickets
+    from datetime import datetime
+
+    when = datetime(2026, 6, 15)
+    with _connect() as conn:
+        for c in customers:
+            for i, pt in enumerate(c.get("past_tickets", [])):
+                state = {
+                    "ticket": {"subject": pt["subject"], "body": pt["body"], "source": "email", "customer_name": c["name"], "customer_email": c["email"]},
+                    "messages": [{"role": "customer", "body": pt["body"]}, {"role": "agent", "body": pt["resolution"]}],
+                    "resolution": pt["resolution"],
+                }
+                conn.execute(
+                    """INSERT INTO tickets (ticket_id, subject, human_status, lifecycle, created_at, state)
+                       VALUES (%s, %s, 'approved', 'resolved', %s, %s)
+                       ON CONFLICT (ticket_id) DO NOTHING""",
+                    (f"HIST-{c['email']}-{i}", pt["subject"], when, Jsonb(state)),
+                )

@@ -14,35 +14,25 @@ def init_crm() -> None:
                 orders  JSONB
             )
         """)
+        # new columns added as a migration seam, same pattern as store.init_db
+        conn.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS plan TEXT")
+        conn.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS account_status TEXT")
+        conn.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS subscription_status TEXT")
+        conn.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS signup_date DATE")
 
 
-def seed_crm() -> None:
-    people = [
-        # --- demo customers (emails match demo.py tickets) ---
-        ("alice@example.com", "Alice Tan", "free", [{"id": "ORD-2001", "item": "Annual Subscription", "status": "active"}]),
-        ("bob@example.com", "Bob Rivera", "premium", [{"id": "ORD-2002", "item": "Pro Subscription", "status": "active", "refund_eligible": True}]),
-        ("chen@example.com", "Chen Wei", "premium", [{"id": "ORD-2003", "item": "Pro Subscription", "status": "refund_pending", "days_pending": 14}]),
-        ("dana@example.com", "Dana Okoro", "free", [{"id": "ORD-2004", "item": "Mechanical Keyboard", "status": "in_transit", "days_since_update": 3}]),
-        ("evan@example.com", "Evan Lee", "free", [{"id": "ORD-2005", "item": "Smart Home Hub", "status": "delivered"}]),
-        ("fiona@example.com", "Fiona Adams", "free", []),
-        ("grace@example.com", "Grace Hall", "premium", [{"id": "ORD-2006", "item": "Mobile App Pro", "status": "active"}]),
-        (
-            "hana@example.com",
-            "Hana Sato",
-            "premium",
-            [{"id": "ORD-2007", "item": "Monthly Subscription", "status": "charged"}, {"id": "ORD-2008", "item": "Monthly Subscription", "status": "charged_duplicate"}],
-        ),
-        # --- extra customers for realism ---
-        ("ivan@example.com", "Ivan Petrov", "free", [{"id": "ORD-2009", "item": "USB-C Cable", "status": "delivered"}]),
-        ("mei@example.com", "Mei Lin", "premium", [{"id": "ORD-2010", "item": "Noise-Cancelling Headphones", "status": "returned"}]),
-    ]
+def seed_crm(customers) -> None:
     with _connect() as conn:
-        for email, name, tier, orders in people:
+        for c in customers:
             conn.execute(
-                """INSERT INTO customers(email, name, tier, orders)
-                   VALUES (%s, %s, %s, %s)
-                   ON CONFLICT (email) DO NOTHING""",
-                (email, name, tier, Jsonb(orders)),
+                """INSERT INTO customers
+                     (email, name, tier, orders, plan, account_status, subscription_status, signup_date)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (email) DO UPDATE SET
+                     name=EXCLUDED.name, tier=EXCLUDED.tier, orders=EXCLUDED.orders, plan=EXCLUDED.plan,
+                     account_status=EXCLUDED.account_status, subscription_status=EXCLUDED.subscription_status,
+                     signup_date=EXCLUDED.signup_date""",
+                (c["email"], c["name"], c["tier"], Jsonb(c["orders"]), c["plan"], c["account_status"], c["subscription_status"], c["signup_date"]),
             )
 
 
