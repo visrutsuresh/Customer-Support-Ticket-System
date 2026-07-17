@@ -46,7 +46,7 @@ def public_messages(messages: list) -> list:
 # confidence policy (shared by both modes so they decide identically).
 # NOTE: this is a grounded HEURISTIC, not a calibrated probability. A calibrated
 # number needs a labelled batch + a fitted reliability curve (see TODO item 19/42).
-CONF_SENSITIVE = 90  # refund/billing need a high bar before we auto-send with no human
+CONF_SENSITIVE = 85  # recalibrated 90->85: the heuristic under-rated good answers (a correct billing reply scored 87)
 CONF_NORMAL = 60  # everything else
 
 

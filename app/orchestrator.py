@@ -106,7 +106,7 @@ def node_decide(state: State) -> dict:
     elif answerable and grounded >= threshold:
         decision = {"action": "auto_send", "reason": "answerable from KB", "confidence": grounded}
     elif answerable:
-        decision = {"action": "escalate", "reason": f"low confidence ({grounded} < {threshold})", "confidence": grounded}
+        decision = {"action": "escalate", "reason": f"below confidence bar ({grounded} < {threshold})", "confidence": grounded}
     elif kind == "question":
         decision = {"action": "auto_send", "reason": "requesting more information"}
     else:

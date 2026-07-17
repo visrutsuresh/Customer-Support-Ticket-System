@@ -19,7 +19,7 @@ def _modal(url: str, prompt: str, max_new_tokens: int) -> str:
     resp = requests.post(
         url,
         json={"prompt": prompt, "token": LANE_TOKEN, "max_new_tokens": max_new_tokens},
-        timeout=180,
+        timeout=90,
     )
     resp.raise_for_status()
     return resp.json()["text"]

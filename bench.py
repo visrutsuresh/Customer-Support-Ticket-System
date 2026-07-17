@@ -2,9 +2,9 @@
 # Drives graph_auto directly, so it is autonomous regardless of AGENT_MODE.
 # Run under the app's normal env (MODEL_TIER as set in .env) + the work-laptop
 # proxy bypass for Weaviate. See the run command in the chat / STATE.
-import concurrent.futures
 import json
 import sys
+import threading
 import time
 from statistics import mean
 
@@ -113,14 +113,22 @@ BATCH = [
 
 def run_one(raw: dict) -> dict:
     t0 = time.perf_counter()
-    ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    fut = ex.submit(GRAPH.invoke, {"raw_input": raw, "audit": []})
-    try:
-        final = fut.result(timeout=TICKET_TIMEOUT_S)
-    except concurrent.futures.TimeoutError:
+    box = {}
+
+    def _work():
+        try:
+            box["final"] = GRAPH.invoke({"raw_input": raw, "audit": []})
+        except Exception as e:  # noqa: BLE001
+            box["error"] = e
+
+    th = threading.Thread(target=_work, daemon=True)  # daemon: a hung ticket is abandoned, never blocks process exit
+    th.start()
+    th.join(TICKET_TIMEOUT_S)
+    if th.is_alive():
         raise RuntimeError(f"timed out after {TICKET_TIMEOUT_S}s (a model call hung)")
-    finally:
-        ex.shutdown(wait=False)
+    if "error" in box:
+        raise box["error"]
+    final = box["final"]
     dt = time.perf_counter() - t0
     c = final.get("classification") or {}
     d = final.get("decision") or {}

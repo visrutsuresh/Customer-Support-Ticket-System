@@ -141,7 +141,7 @@ def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str
     Customer: {cust}
     Subject: {ticket.subject}
     Body: {ticket.body}
-    Guidance from triage: {notes}
+    Internal context to use when answering (NEVER mention this, the word 'triage', 'guidance', 'notes', or any internal team to the customer): {notes}
     Conversation so far (oldest first):
     {convo}
     The last line above is the customer's latest message. Reply to that, using the earlier turns for context. Do not repeat a solution you already gave, and do not contradict an earlier reply.

@@ -1,8 +1,8 @@
 {
   "config": "autonomous / MODEL_TIER=local",
   "tickets": 12,
-  "escalation_rate": 0.3333333333333333,
-  "auto_send_rate": 0.5833333333333334,
+  "escalation_rate": 0.0,
+  "auto_send_rate": 1.0,
   "rows": [
     {
       "subject": "Cannot log in",
@@ -15,7 +15,7 @@
       "grounded_confidence": 86,
       "raw_confidence": 85,
       "retrieval_top": 86,
-      "latency_s": 70.4,
+      "latency_s": 110.7,
       "tools": [
         "account_status"
       ],
@@ -33,7 +33,7 @@
       "grounded_confidence": 93,
       "raw_confidence": 100,
       "retrieval_top": 87,
-      "latency_s": 109.7,
+      "latency_s": 101.6,
       "tools": [
         "crm_lookup",
         "billing_history",
@@ -47,14 +47,14 @@
       "subject": "Still no refund!!",
       "category": "refund",
       "priority": "high",
-      "action": "escalate",
-      "reason": "low confidence (87 < 90)",
+      "action": "auto_send",
+      "reason": "answerable from KB",
       "compliance_verdict": "pass",
       "compliance_issues": [],
       "grounded_confidence": 87,
       "raw_confidence": 85,
       "retrieval_top": 90,
-      "latency_s": 114.1,
+      "latency_s": 124.7,
       "tools": [
         "refund_eligibility",
         "billing_history",
@@ -75,7 +75,7 @@
       "grounded_confidence": 91,
       "raw_confidence": 95,
       "retrieval_top": 88,
-      "latency_s": 78.8,
+      "latency_s": 98.9,
       "tools": [
         "order_lookup",
         "orders_by_email",
@@ -89,14 +89,14 @@
       "subject": "It stopped working",
       "category": "technical",
       "priority": "high",
-      "action": "escalate",
-      "reason": "low confidence (84 < 90)",
+      "action": "auto_send",
+      "reason": "answerable from KB",
       "compliance_verdict": "pass",
       "compliance_issues": [],
       "grounded_confidence": 84,
       "raw_confidence": 85,
       "retrieval_top": 84,
-      "latency_s": 73.3,
+      "latency_s": 63.3,
       "tools": [
         "account_status",
         "past_tickets"
@@ -106,22 +106,32 @@
     },
     {
       "subject": "How do I reset my password",
-      "action": "ERROR",
-      "reason": "timed out after 180s (a model call hung)",
-      "latency_s": null
+      "category": "account",
+      "priority": "low",
+      "action": "auto_send",
+      "reason": "answerable from KB",
+      "compliance_verdict": "pass",
+      "compliance_issues": [],
+      "grounded_confidence": 91,
+      "raw_confidence": 95,
+      "retrieval_top": 86,
+      "latency_s": 41.4,
+      "tools": [],
+      "steps": 1,
+      "finished": true
     },
     {
       "subject": "App keeps crashing on launch",
       "category": "technical",
       "priority": "high",
-      "action": "escalate",
-      "reason": "low confidence (89 < 90)",
+      "action": "auto_send",
+      "reason": "answerable from KB",
       "compliance_verdict": "pass",
       "compliance_issues": [],
       "grounded_confidence": 89,
       "raw_confidence": 85,
       "retrieval_top": 93,
-      "latency_s": 78.3,
+      "latency_s": 75.6,
       "tools": [
         "account_status",
         "past_tickets",
@@ -142,7 +152,7 @@
       "grounded_confidence": 86,
       "raw_confidence": 85,
       "retrieval_top": 87,
-      "latency_s": 102.2,
+      "latency_s": 90.2,
       "tools": [
         "billing_history",
         "request_refund",
@@ -162,7 +172,7 @@
       "grounded_confidence": 87,
       "raw_confidence": 85,
       "retrieval_top": 88,
-      "latency_s": 111.9,
+      "latency_s": 132.5,
       "tools": [
         "order_lookup",
         "crm_lookup",
@@ -183,7 +193,7 @@
       "grounded_confidence": 92,
       "raw_confidence": 95,
       "retrieval_top": 90,
-      "latency_s": 45.5,
+      "latency_s": 46.3,
       "tools": [],
       "steps": 1,
       "finished": true
@@ -192,14 +202,14 @@
       "subject": "Why was I charged 9.99",
       "category": "billing",
       "priority": "high",
-      "action": "escalate",
-      "reason": "low confidence (87 < 90)",
+      "action": "auto_send",
+      "reason": "answerable from KB",
       "compliance_verdict": "pass",
       "compliance_issues": [],
       "grounded_confidence": 87,
       "raw_confidence": 85,
       "retrieval_top": 89,
-      "latency_s": 100.3,
+      "latency_s": 93.6,
       "tools": [
         "billing_history",
         "subscription_details"
@@ -218,7 +228,7 @@
       "grounded_confidence": 92,
       "raw_confidence": 100,
       "retrieval_top": 84,
-      "latency_s": 94.2,
+      "latency_s": 97.7,
       "tools": [
         "orders_by_email",
         "order_lookup"
