@@ -82,21 +82,23 @@ PIPELINE_TIMEOUT_S = 180  # same wall-clock cap bench.py uses
 
 
 def _invoke_guarded(ticket_id: str, initial: dict):
-    # run the graph with a hard time cap so one hung ticket can't jam the background queue
-    box = {}
+    # run the graph with a hard time cap so one hung ticket can't jam the background queue.
+    # two attempts: a timeout is usually a Modal cold start, and the retry hits a warm container.
+    for _attempt in (1, 2):
+        box = {}
 
-    def work():
-        try:
-            box["final"] = active_graph.invoke(initial, {"recursion_limit": 40})
-        except Exception as e:
-            box["error"] = str(e)
+        def work():
+            try:
+                box["final"] = active_graph.invoke(initial, {"recursion_limit": 40})
+            except Exception as e:
+                box["error"] = str(e)
 
-    th = threading.Thread(target=work, daemon=True)  # daemon: a hung call is abandoned, never blocks exit
-    th.start()
-    th.join(PIPELINE_TIMEOUT_S)
-    if "final" in box:
-        return box["final"]
-    store.set_status(ticket_id, "error")  # timed out or crashed: visible, never silent
+        th = threading.Thread(target=work, daemon=True)  # daemon: a hung call is abandoned, never blocks exit
+        th.start()
+        th.join(PIPELINE_TIMEOUT_S)
+        if "final" in box:
+            return box["final"]
+    store.set_status(ticket_id, "error")  # both attempts timed out or crashed: visible, never silent
     return None
 
 
