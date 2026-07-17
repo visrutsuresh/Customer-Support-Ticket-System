@@ -6,7 +6,7 @@ from app.kb import index_resolved
 from app.pii import scan
 from app.state import public_messages
 
-MAX_STEPS = 5
+MAX_STEPS = 8
 
 
 def _parse(raw: str) -> dict:
@@ -161,32 +161,50 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None)
         f"Conversation so far (oldest first):\n{convo}\n"
         f"Knowledge-base articles retrieved for this ticket:\n{kb_preview}"
     )
-    transcript, customer, proposed = "", None, None
-    for _ in range(MAX_STEPS):
-        move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}\nYour JSON:", max_new_tokens=512))
+    transcript, customer, proposed, calls = "", None, None, []
+    cache, redundant = {}, 0  # the 14B re-calls the same tool forever; block repeats and force a decision
+    for step in range(MAX_STEPS):
+        # once we have enough context, or the model starts repeating, demand a decision instead of more tools
+        must_finish = len(cache) >= 4 or redundant >= 2 or step >= MAX_STEPS - 1
+        hint = "\nSTOP calling tools. You have enough context now. Reply ONLY with the finish JSON." if must_finish else ""
+        move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}{hint}\nYour JSON:", max_new_tokens=512))
         action = move.get("action")
         if action == "finish":
             r = move["result"]
             kind = r.get("kind", "escalate")
             conf = r.get("confidence")
+            diag = {"tools_called": calls, "steps": step + 1, "finished": True}
             if kind == "escalate":
-                return {"kind": "escalate", "reply": "", "confidence": conf, "proposed_action": proposed}
+                return {"kind": "escalate", "reply": "", "confidence": conf, "proposed_action": proposed, **diag}
             reply = _write_reply(ticket, articles, customer, r.get("notes", ""), lane, tier, convo)
-            return {"kind": kind, "reply": reply.strip(), "confidence": conf, "proposed_action": proposed}
-        if action == "crm_lookup":
-            customer = tools.crm_lookup(**move.get("args", {}))
-            transcript += f"\ncrm_lookup -> {customer}"
-        elif action in tools.TOOLS:
-            args = dict(move.get("args", {}))
-            if action == "cancel_subscription":
-                args["ticket_id"] = ticket.ticket_id  # injected; the model never provides it
-            obs = tools.run_tool(action, args)
-            transcript += f"\n{action}({move.get('args', {})}) -> {obs}"
-            if action in ("request_refund", "cancel_subscription"):
-                proposed = {"tool": action, "args": move.get("args", {}), "result": obs}
-        else:
+            return {"kind": kind, "reply": reply.strip(), "confidence": conf, "proposed_action": proposed, **diag}
+        args = move.get("args", {}) or {}
+        if action != "crm_lookup" and action not in tools.TOOLS:
             transcript += f"\nunknown action {action!r}"
-    return {"kind": "escalate", "reply": "", "confidence": None, "proposed_action": proposed}  # fallback: never decided
+            continue
+        key = f"{action}:{json.dumps(args, sort_keys=True)}"
+        if key in cache:  # already called with these args: block the repeat, push toward finishing
+            redundant += 1
+            transcript += f"\n{action} already called; its result is above. Do not repeat it, decide now."
+            continue
+        if action == "crm_lookup":
+            calls.append("crm_lookup")
+            customer = tools.crm_lookup(**args)
+            cache[key] = customer
+            transcript += f"\ncrm_lookup -> {customer}"
+        else:
+            calls.append(action)
+            targs = dict(args)
+            if action == "cancel_subscription":
+                targs["ticket_id"] = ticket.ticket_id  # injected; the model never provides it
+            obs = tools.run_tool(action, targs)
+            cache[key] = obs
+            transcript += f"\n{action}({args}) -> {obs}"
+            if action in ("request_refund", "cancel_subscription"):
+                proposed = {"tool": action, "args": args, "result": obs}
+    # fallback: still no decision after all that -> escalate (should now be rare)
+    return {"kind": "escalate", "reply": "", "confidence": None, "proposed_action": proposed,
+            "tools_called": calls, "steps": MAX_STEPS, "finished": False}
 
 
 REVIEW_SYSTEM = """

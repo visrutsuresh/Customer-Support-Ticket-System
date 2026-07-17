@@ -78,6 +78,7 @@ def init_db():
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS csat INT")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS merged_into TEXT")
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_email TEXT")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS ticket_links(
@@ -126,12 +127,13 @@ def save(state: dict) -> None:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO tickets
-                 (ticket_id, subject, category, priority, action, assignee, human_status, created_at,due_at, state)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 (ticket_id, subject, category, priority, action, assignee, human_status, created_at,due_at, state, customer_email)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (ticket_id) DO UPDATE SET
                  subject=EXCLUDED.subject, category=EXCLUDED.category, priority=EXCLUDED.priority,
                  action=EXCLUDED.action, assignee=EXCLUDED.assignee,
-                 human_status=EXCLUDED.human_status, created_at=EXCLUDED.created_at,due_at=EXCLUDED.due_at, state=EXCLUDED.state""",
+                 human_status=EXCLUDED.human_status, created_at=EXCLUDED.created_at,due_at=EXCLUDED.due_at,
+                 state=EXCLUDED.state, customer_email=EXCLUDED.customer_email""",
             (
                 t.ticket_id,
                 t.subject,
@@ -143,6 +145,7 @@ def save(state: dict) -> None:
                 t.created_at,
                 due_at,
                 Jsonb(jsonable_encoder(state)),
+                t.customer_email,
             ),
         )
 
@@ -157,10 +160,10 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
     }
     with _connect() as conn:
         conn.execute(
-            """INSERT INTO tickets (ticket_id, subject, human_status, created_at, state)
-               VALUES (%s, %s, 'processing', %s, %s)
+            """INSERT INTO tickets (ticket_id, subject, human_status, created_at, state, customer_email)
+               VALUES (%s, %s, 'processing', %s, %s, %s)
                ON CONFLICT (ticket_id) DO NOTHING""",
-            (ticket_id, subject, created_at, Jsonb(minimal)),
+            (ticket_id, subject, created_at, Jsonb(minimal), email),
         )
 
 
@@ -425,39 +428,59 @@ def past_tickets(email: str) -> list[dict]:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
             """SELECT subject, state FROM tickets
-               WHERE state -> 'ticket' ->> 'customer_email' = %s AND lifecycle = 'resolved'
+               WHERE customer_email = %s AND lifecycle = 'resolved'
                ORDER BY created_at DESC""",
             (email,),
         )
         return [{"subject": r["subject"], "resolution": (r["state"] or {}).get("resolution", "")} for r in cur.fetchall()]
 
 
+def file_as_history(ticket_id: str) -> str:
+    # a resolved ticket is a past ticket now: swap its T- prefix for HIST-, keep the 8-char suffix
+    new_id = "HIST-" + ticket_id.split("-", 1)[-1]
+    if new_id == ticket_id:  # already filed
+        return ticket_id
+    with _connect() as conn:
+        conn.execute("UPDATE tickets SET ticket_id = %s WHERE ticket_id = %s", (new_id, ticket_id))
+        conn.execute("UPDATE attachments SET ticket_id = %s WHERE ticket_id = %s", (new_id, ticket_id))
+        conn.execute("UPDATE ticket_links SET a = %s WHERE a = %s", (new_id, ticket_id))
+        conn.execute("UPDATE ticket_links SET b = %s WHERE b = %s", (new_id, ticket_id))
+    return new_id
+
+
 def seed_history(customers) -> None:
-    # resolved tickets per customer so past_tickets has data; deterministic ids, never touches real tickets
-    from datetime import datetime
+    # resolved tickets per customer so past_tickets has data; deterministic ids, never touches real tickets.
+    # every reporting field is filled so history reads like real, worked tickets.
+    import hashlib
+    from datetime import datetime, timedelta
 
     from app.roster import assign
 
-    when = datetime(2026, 6, 15)
     with _connect() as conn:
         conn.execute("DELETE FROM tickets WHERE ticket_id LIKE 'HIST-%'")  # clear old HIST, leave real tickets alone
         for c in customers:
             for i, pt in enumerate(c.get("past_tickets", [])):
-                tid = f"HIST-{c['email']}-{i}"
+                tid = "HIST-" + hashlib.sha1(f"{c['email']}-{i}".encode()).hexdigest()[:8]  # 8-char id, HIST prefix
                 category = pt.get("category", "general")
                 priority = pt.get("priority", "medium")
+                sentiment = pt.get("sentiment", "neutral")
                 escalated = priority in ("high", "critical")
                 action = "escalate" if escalated else "auto_send"
-                assignee = assign(category, priority, tid)["name"] if escalated else None
+                owner = assign(category, priority, tid)  # every worked ticket has an owner
+                created = datetime(2026, 7, 15) - timedelta(days=20 + sum(ord(ch) for ch in tid) % 160)  # spread out
+                due_at = created + timedelta(minutes=SLA_RESOLUTION_MINUTES.get(priority, SLA_RESOLUTION_MINUTES["medium"]))
+                tags = [category] + ([priority] if escalated else []) + (["unhappy"] if sentiment == "negative" else [])
                 state = {
                     "ticket": {"subject": pt["subject"], "body": pt["body"], "source": "email", "customer_name": c["name"], "customer_email": c["email"]},
-                    "classification": {"category": category, "priority": priority},
+                    "classification": {"category": category, "priority": priority, "sentiment": sentiment},
+                    "decision": {"action": action, "assignee": owner},
                     "messages": [{"role": "customer", "body": pt["body"]}, {"role": "agent", "body": pt["resolution"]}],
                     "resolution": pt["resolution"],
                 }
                 conn.execute(
                     """INSERT INTO tickets
-                         (ticket_id, subject, category, priority, action, assignee, human_status, lifecycle, created_at, state, csat)
-                       VALUES (%s, %s, %s, %s, %s, %s, 'approved', 'resolved', %s, %s, %s)""",
-                    (tid, pt["subject"], category, priority, action, assignee, when, Jsonb(state), pt.get("csat")),
+                         (ticket_id, subject, category, priority, action, assignee, human_status, lifecycle,
+                          created_at, due_at, tags, state, csat, customer_email)
+                       VALUES (%s, %s, %s, %s, %s, %s, 'approved', 'resolved', %s, %s, %s, %s, %s, %s)""",
+                    (tid, pt["subject"], category, priority, action, owner["name"], created, due_at, Jsonb(tags), Jsonb(state), pt.get("csat"), c["email"]),
                 )

@@ -213,8 +213,9 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None):
     agent_msgs = [m["body"] for m in state.get("messages", []) if m["role"] == "agent"]
     resolution = agent_msgs[-1] if agent_msgs else (state.get("draft") or {}).get("reply", "")
     out = learn_agent(ticket, resolution, resolved=True)
+    new_id = store.file_as_history(ticket_id)  # resolved -> past ticket, re-filed under the HIST- prefix
     return {
-        "ticket_id": ticket_id,
+        "ticket_id": new_id,
         "lifecycle": "resolved",
         "learned": out.get("learned", False),
         "csat": csat,

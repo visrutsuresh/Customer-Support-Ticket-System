@@ -4,12 +4,18 @@
 # proxy bypass for Weaviate. See the run command in the chat / STATE.
 import concurrent.futures
 import json
+import sys
 import time
 from statistics import mean
 
 from app import router
+from app.graph import graph as graph_det
 from app.orchestrator import graph_auto
 from app.state import grounded_confidence
+
+# pick the pipeline: pass "deterministic" for the tool-free control, else autonomous (default)
+MODE = sys.argv[1] if len(sys.argv) > 1 else "autonomous"
+GRAPH = graph_det if MODE.startswith("det") else graph_auto
 
 # Hard per-ticket wall-clock cap: if a ticket's model calls stall past this,
 # abandon it, log ERROR, and move on so one hung call can't freeze the batch.
@@ -108,7 +114,7 @@ BATCH = [
 def run_one(raw: dict) -> dict:
     t0 = time.perf_counter()
     ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    fut = ex.submit(graph_auto.invoke, {"raw_input": raw, "audit": []})
+    fut = ex.submit(GRAPH.invoke, {"raw_input": raw, "audit": []})
     try:
         final = fut.result(timeout=TICKET_TIMEOUT_S)
     except concurrent.futures.TimeoutError:
@@ -137,6 +143,9 @@ def run_one(raw: dict) -> dict:
         "raw_confidence": raw_conf,
         "retrieval_top": round(top),
         "latency_s": round(dt, 1),
+        "tools": draft.get("tools_called"),
+        "steps": draft.get("steps"),
+        "finished": draft.get("finished"),
     }
 
 
@@ -166,7 +175,7 @@ def main() -> None:
             f"{str(r.get('latency_s')):>6}  {r.get('reason')}"
         )
     print("=" * 100)
-    print(f"config          : autonomous / MODEL_TIER={router.MODEL_TIER}")
+    print(f"config          : {MODE} / MODEL_TIER={router.MODEL_TIER}")
     print(f"tickets         : {total}")
     print(f"escalation rate : {len(esc)}/{total} = {len(esc) / total:.0%}")
     print(f"auto-send rate  : {len(auto)}/{total} = {len(auto) / total:.0%}")
@@ -179,16 +188,30 @@ def main() -> None:
         for i, r in fails:
             print(f"  #{i} {r['subject']!r}: {r.get('compliance_issues')}")
 
+    # diagnostics: did the generate agent run out of ReAct steps (fallback -> escalate)? which tools fired?
+    from collections import Counter
+
+    fallbacks = [i for i, r in enumerate(rows, start=1) if r.get("finished") is False]
+    steps_used = [r["steps"] for r in rows if isinstance(r.get("steps"), int)]
+    tool_hist = Counter(t for r in rows for t in (r.get("tools") or []))
+    print("\ndiagnostics (generate agent):")
+    print(f"  fallback escalates (never finished in MAX_STEPS): {len(fallbacks)}/{total}  tickets {fallbacks}")
+    print(f"  avg steps used  : {mean(steps_used):.1f}" if steps_used else "  avg steps used  : n/a")
+    print(f"  tool call counts: {dict(tool_hist)}")
+    for i, r in enumerate(rows, start=1):
+        print(f"  #{i:>2} steps={r.get('steps')} finished={r.get('finished')} action={r.get('action')} tools={r.get('tools')}")
+
     out = {
-        "config": f"autonomous / MODEL_TIER={router.MODEL_TIER}",
+        "config": f"{MODE} / MODEL_TIER={router.MODEL_TIER}",
         "tickets": total,
         "escalation_rate": len(esc) / total,
         "auto_send_rate": len(auto) / total,
         "rows": rows,
     }
-    with open("bench_baseline.json", "w") as f:
+    outfile = f"bench_{MODE}.json"
+    with open(outfile, "w") as f:
         json.dump(out, f, indent=2)
-    print("\nsaved -> bench_baseline.json")
+    print(f"\nsaved -> {outfile}")
 
 
 if __name__ == "__main__":
