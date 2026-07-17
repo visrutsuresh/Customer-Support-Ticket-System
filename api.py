@@ -1,4 +1,5 @@
 import os
+import threading
 import uuid
 from datetime import datetime, timezone
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from app import store
 from app.agents import learn_agent
+from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
 from app.orchestrator import graph_auto
 from app.router import MODEL_TIER
@@ -76,16 +78,38 @@ def _ack_escalation(ticket_id: str) -> None:
     store.append_message(ticket_id, "agent", ESCALATION_ACK)
 
 
+PIPELINE_TIMEOUT_S = 180  # same wall-clock cap bench.py uses
+
+
+def _invoke_guarded(ticket_id: str, initial: dict):
+    # run the graph with a hard time cap so one hung ticket can't jam the background queue
+    box = {}
+
+    def work():
+        try:
+            box["final"] = active_graph.invoke(initial, {"recursion_limit": 40})
+        except Exception as e:
+            box["error"] = str(e)
+
+    th = threading.Thread(target=work, daemon=True)  # daemon: a hung call is abandoned, never blocks exit
+    th.start()
+    th.join(PIPELINE_TIMEOUT_S)
+    if "final" in box:
+        return box["final"]
+    store.set_status(ticket_id, "error")  # timed out or crashed: visible, never silent
+    return None
+
+
 def _process(ticket_id: str, raw: dict):
-    final = active_graph.invoke(
+    final = _invoke_guarded(
+        ticket_id,
         {
             "raw_input": {**raw, "ticket_id": ticket_id},
             "messages": [{"role": "customer", "body": raw["body"]}],
             "audit": [],
         },
-        {"recursion_limit": 40},
     )
-    if final.get("ticket") is not None:
+    if final and final.get("ticket") is not None:
         store.save(final)
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
@@ -104,11 +128,8 @@ def _reprocess(ticket_id: str, latest: str):
         "name": t.get("customer_name"),
         "email": t.get("customer_email"),
     }
-    final = active_graph.invoke(
-        {"raw_input": raw, "messages": prior.get("messages", []), "audit": []},
-        {"recursion_limit": 40},
-    )
-    if final.get("ticket") is not None:
+    final = _invoke_guarded(ticket_id, {"raw_input": raw, "messages": prior.get("messages", []), "audit": []})
+    if final and final.get("ticket") is not None:
         store.save(final)
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
@@ -138,6 +159,18 @@ class EditIn(BaseModel):
     reply: str
 
 
+def dispatch_reply(state: dict, reply: str) -> str:
+    # send through the channel the ticket arrived on: email -> SMTP, everything else -> in-app thread
+    t = state["ticket"]
+    if t.get("source") == "email" and t.get("customer_email"):
+        try:
+            send_email(t["customer_email"], f"Re: {t['subject']}", reply)
+            return "email_sent"
+        except Exception as e:
+            return f"email_failed: {e}"
+    return "in_app"
+
+
 @app.post("/tickets/{ticket_id}/approve")
 def approve_reply(ticket_id: str):
     state = store.get(ticket_id)
@@ -146,13 +179,15 @@ def approve_reply(ticket_id: str):
     decision = state.get("decision") or {}
     reply = (state.get("draft") or {}).get("reply", "")
     store.set_status(ticket_id, "approved")
+    delivery = None
     if decision.get("action") == "auto_send" and reply:
         store.append_message(ticket_id, "agent", reply)  # send: reply joins the thread
+        delivery = dispatch_reply(state, reply)  # and out through the source channel
         store.set_lifecycle(ticket_id, "awaiting_customer")  # ball to the customer
         lifecycle = "awaiting_customer"
     else:
         lifecycle = "open"  # escalation stays in our court, nothing sent
-    return {"ticket_id": ticket_id, "human_status": "approved", "lifecycle": lifecycle}
+    return {"ticket_id": ticket_id, "human_status": "approved", "lifecycle": lifecycle, "delivery": delivery}
 
 
 @app.post("/tickets/{ticket_id}/reject")
@@ -185,6 +220,30 @@ def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks
     store.append_message(ticket_id, "customer", payload.body)  # message thread grows & lifecycle -> open
     background.add_task(_reprocess, ticket_id, payload.body)
     return {"ticket_id": ticket_id, "status": "processing"}
+
+
+@app.post("/email/sync")
+def email_sync(background: BackgroundTasks):
+    try:
+        emails, skipped = fetch_unread()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"email fetch failed: {e}")
+    created = []
+    for raw in emails:
+        ticket_id = f"T-{uuid.uuid4().hex[:8]}"
+        store.save_pending(
+            ticket_id,
+            raw["subject"],
+            raw["body"],
+            raw["source"],
+            raw["name"],
+            raw["email"],
+            datetime.now(timezone.utc),
+        )
+        payload = {k: raw[k] for k in ("subject", "body", "source", "name", "email")}
+        background.add_task(_process, ticket_id, payload)
+        created.append(ticket_id)
+    return {"fetched": len(emails), "skipped": skipped, "ticket_ids": created}
 
 
 class ResolveIn(BaseModel):
