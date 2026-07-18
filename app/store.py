@@ -167,6 +167,19 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
         )
 
 
+def list_by_email(email: str) -> list[dict]:
+    # the customer portal's "my requests": tickets born from this email, newest first
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute(
+            """SELECT ticket_id, subject, human_status, lifecycle, created_at
+               FROM tickets WHERE lower(customer_email) = lower(%s) AND merged_into IS NULL
+               ORDER BY created_at DESC""",
+            (email,),
+        )
+        return cur.fetchall()
+
+
 def list_all(status=None, category=None, tag=None, q=None) -> list[dict]:
     clauses, params = ["merged_into IS NULL"], []
     if status:

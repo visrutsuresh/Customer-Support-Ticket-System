@@ -3,7 +3,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -14,7 +14,17 @@ from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
 from app.orchestrator import graph_auto
 from app.router import MODEL_TIER
+from app.schemas import UserCreate, UserRead, UserUpdate
 from app.state import Ticket, public_messages
+from app.users import (
+    User,
+    auth_backend,
+    create_user_table,
+    current_user,
+    fastapi_users,
+    require_admin,
+    require_staff,
+)
 
 store.init_db()  # make sure the tickets table exists when the API boots
 
@@ -27,9 +37,28 @@ app = FastAPI(title="Support Ticket Triage API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"])
+
+
+@app.on_event("startup")
+async def _startup():
+    await create_user_table()
+
+
+@app.get("/config")
+def brand_config():
+    # the client company's branding; the portal renders this, Enklima stays vendor-side
+    return {
+        "brand_name": os.getenv("BRAND_NAME", "Support"),
+        "brand_tagline": os.getenv("BRAND_TAGLINE", ""),
+    }
 
 
 class TicketIn(BaseModel):
@@ -46,8 +75,11 @@ def health():
 
 
 @app.post("/tickets")
-def create_ticket(payload: TicketIn, background: BackgroundTasks):
+def create_ticket(payload: TicketIn, background: BackgroundTasks, user: User = Depends(current_user)):
     ticket_id = f"T-{uuid.uuid4().hex[:8]}"
+    if user.role == "customer":
+        payload.email = user.email  # identity comes from the account, never the form
+        payload.name = payload.name or user.email.split("@")[0]
     store.save_pending(
         ticket_id,
         payload.subject,
@@ -139,18 +171,36 @@ def _reprocess(ticket_id: str, latest: str):
             _ack_escalation(ticket_id)
 
 
+def _require_ticket_access(ticket_id: str, user: User) -> dict:
+    # staff see everything; a customer only touches tickets born from their email
+    state = store.get(ticket_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    if user.role == "customer" and (state["ticket"].get("customer_email") or "").lower() != user.email.lower():
+        raise HTTPException(status_code=403, detail="not your ticket")
+    return state
+
+
+@app.get("/my/tickets")
+def my_tickets(user: User = Depends(current_user)):
+    if user.role != "customer":
+        raise HTTPException(status_code=403, detail="customer view")
+    return store.list_by_email(user.email)
+
+
 @app.get("/tickets")
 def list_tickets(
     status: str | None = None,
     category: str | None = None,
     tag: str | None = None,
     q: str | None = None,
+    user: User = Depends(require_staff),
 ):
     return store.list_all(status=status, category=category, tag=tag, q=q)
 
 
 @app.get("/tickets/{ticket_id}")
-def get_ticket(ticket_id: str):
+def get_ticket(ticket_id: str, user: User = Depends(require_staff)):
     state = store.get(ticket_id)
     if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -174,7 +224,7 @@ def dispatch_reply(state: dict, reply: str) -> str:
 
 
 @app.post("/tickets/{ticket_id}/approve")
-def approve_reply(ticket_id: str):
+def approve_reply(ticket_id: str, user: User = Depends(require_staff)):
     state = store.get(ticket_id)
     if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -193,21 +243,21 @@ def approve_reply(ticket_id: str):
 
 
 @app.post("/tickets/{ticket_id}/reject")
-def reject_reply(ticket_id: str):
+def reject_reply(ticket_id: str, user: User = Depends(require_staff)):
     if not store.set_status(ticket_id, "rejected"):
         raise HTTPException(status_code=404, detail="ticket not found")
     return {"ticket_id": ticket_id, "human_status": "rejected"}
 
 
 @app.post("/tickets/{ticket_id}/edit")
-def edit_reply(ticket_id: str, payload: EditIn):
+def edit_reply(ticket_id: str, payload: EditIn, user: User = Depends(require_staff)):
     if not store.edit_reply(ticket_id, payload.reply):
         raise HTTPException(status_code=404, detail="ticket not found")
     return {"ticket_id": ticket_id, "human_status": "edited"}
 
 
 @app.get("/metrics")
-def get_metrics():
+def get_metrics(user: User = Depends(require_staff)):
     return store.metrics()
 
 
@@ -216,16 +266,15 @@ class ReplyIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/reply")
-def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks):
-    if store.get(ticket_id) is None:
-        raise HTTPException(status_code=404, detail="ticket not found")
+def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks, user: User = Depends(current_user)):
+    _require_ticket_access(ticket_id, user)
     store.append_message(ticket_id, "customer", payload.body)  # message thread grows & lifecycle -> open
     background.add_task(_reprocess, ticket_id, payload.body)
     return {"ticket_id": ticket_id, "status": "processing"}
 
 
 @app.post("/email/sync")
-def email_sync(background: BackgroundTasks):
+def email_sync(background: BackgroundTasks, user: User = Depends(require_staff)):
     try:
         emails, skipped = fetch_unread()
     except Exception as e:
@@ -253,10 +302,8 @@ class ResolveIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/resolve")
-def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None):
-    state = store.get(ticket_id)
-    if state is None:
-        raise HTTPException(status_code=404, detail="ticket not found")
+def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User = Depends(current_user)):
+    state = _require_ticket_access(ticket_id, user)
     csat = payload.csat if payload else None
     if csat is not None:
         store.set_csat(ticket_id, csat)  # record the rating
@@ -288,7 +335,7 @@ class TagIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/tags")
-def add_ticket_tag(ticket_id: str, payload: TagIn):
+def add_ticket_tag(ticket_id: str, payload: TagIn, user: User = Depends(require_staff)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     store.add_tag(ticket_id, payload.tag)
@@ -296,7 +343,7 @@ def add_ticket_tag(ticket_id: str, payload: TagIn):
 
 
 @app.delete("/tickets/{ticket_id}/tags/{tag}")
-def remove_ticket_tag(ticket_id: str, tag: str):
+def remove_ticket_tag(ticket_id: str, tag: str, user: User = Depends(require_staff)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     store.remove_tag(ticket_id, tag)
@@ -308,7 +355,7 @@ class NoteIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/note")
-def add_internal_note(ticket_id: str, payload: NoteIn):
+def add_internal_note(ticket_id: str, payload: NoteIn, user: User = Depends(require_staff)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     store.append_message(ticket_id, "internal", payload.body)
@@ -316,10 +363,8 @@ def add_internal_note(ticket_id: str, payload: NoteIn):
 
 
 @app.get("/tickets/{ticket_id}/thread")
-def customer_thread(ticket_id: str):
-    state = store.get(ticket_id)
-    if state is None:
-        raise HTTPException(status_code=404, detail="ticket not found")
+def customer_thread(ticket_id: str, user: User = Depends(current_user)):
+    state = _require_ticket_access(ticket_id, user)
     messages = public_messages(state.get("messages", []))
     return {"ticket_id": ticket_id, "messages": messages}
 
@@ -333,17 +378,17 @@ class TemplateIn(BaseModel):
 
 
 @app.get("/templates")
-def list_templates():
+def list_templates(user: User = Depends(require_staff)):
     return store.list_templates()
 
 
 @app.post("/templates")
-def add_template(payload: TemplateIn):
+def add_template(payload: TemplateIn, user: User = Depends(require_admin)):
     return store.create_template(payload.name, payload.body, payload.category, payload.keywords, payload.auto_use)
 
 
 @app.get("/templates/{template_id}")
-def read_template(template_id: int):
+def read_template(template_id: int, user: User = Depends(require_staff)):
     tpl = store.get_template(template_id)
     if tpl is None:
         raise HTTPException(status_code=404, detail="template not found")
@@ -351,7 +396,7 @@ def read_template(template_id: int):
 
 
 @app.put("/templates/{template_id}")
-def edit_template(template_id: int, payload: TemplateIn):
+def edit_template(template_id: int, payload: TemplateIn, user: User = Depends(require_admin)):
     tpl = store.update_template(
         template_id,
         payload.name,
@@ -366,7 +411,7 @@ def edit_template(template_id: int, payload: TemplateIn):
 
 
 @app.delete("/templates/{template_id}")
-def remove_template(template_id: int):
+def remove_template(template_id: int, user: User = Depends(require_admin)):
     if not store.delete_template(template_id):
         raise HTTPException(status_code=404, detail="template not found")
     return {"template_id": template_id, "deleted": True}
@@ -377,7 +422,7 @@ class ApplyTemplateIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/apply-template")
-def apply_template(ticket_id: str, payload: ApplyTemplateIn):
+def apply_template(ticket_id: str, payload: ApplyTemplateIn, user: User = Depends(require_staff)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     tpl = store.get_template(payload.template_id)
@@ -396,7 +441,7 @@ class MergeIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/merge")
-def merge_ticket(ticket_id: str, payload: MergeIn):
+def merge_ticket(ticket_id: str, payload: MergeIn, user: User = Depends(require_staff)):
     if not store.merge_tickets(payload.duplicate_id, ticket_id):
         raise HTTPException(
             status_code=400,
@@ -410,7 +455,7 @@ class LinkIn(BaseModel):
 
 
 @app.post("/tickets/{ticket_id}/link")
-def link_ticket(ticket_id: str, payload: LinkIn):
+def link_ticket(ticket_id: str, payload: LinkIn, user: User = Depends(require_staff)):
     if not store.link_tickets(ticket_id, payload.other_id):
         raise HTTPException(status_code=400, detail="link failed: both ids must exist and differ")
     return {"linked": sorted([ticket_id, payload.other_id])}
@@ -429,7 +474,7 @@ ALLOWED_ATTACHMENT_TYPES = {
 
 
 @app.post("/tickets/{ticket_id}/attachments")
-async def upload_attachment(ticket_id: str, file: UploadFile = File(...)):
+async def upload_attachment(ticket_id: str, file: UploadFile = File(...), user: User = Depends(require_staff)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     if file.content_type not in ALLOWED_ATTACHMENT_TYPES:
@@ -443,14 +488,14 @@ async def upload_attachment(ticket_id: str, file: UploadFile = File(...)):
 
 
 @app.get("/tickets/{ticket_id}/attachments")
-def list_ticket_attachments(ticket_id: str):
+def list_ticket_attachments(ticket_id: str, user: User = Depends(require_staff)):
     if store.get(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     return store.list_attachments(ticket_id)
 
 
 @app.get("/attachments/{attachment_id}")
-def download_attachment(attachment_id: int):
+def download_attachment(attachment_id: int, user: User = Depends(require_staff)):
     a = store.get_attachment(attachment_id)
     if a is None:
         raise HTTPException(status_code=404, detail="attachment not found")
