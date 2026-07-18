@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app import store
+from app import jira_channel, store
 from app.agents import learn_agent
 from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
@@ -117,6 +117,7 @@ def _invoke_guarded(ticket_id: str, initial: dict):
     # run the graph with a hard time cap so one hung ticket can't jam the background queue.
     # two attempts: a timeout is usually a Modal cold start, and the retry hits a warm container.
     for _attempt in (1, 2):
+        print(f"[pipeline] {ticket_id} attempt {_attempt} start", flush=True)
         box = {}
 
         def work():
@@ -129,7 +130,9 @@ def _invoke_guarded(ticket_id: str, initial: dict):
         th.start()
         th.join(PIPELINE_TIMEOUT_S)
         if "final" in box:
+            print(f"[pipeline] {ticket_id} done on attempt {_attempt}", flush=True)
             return box["final"]
+        print(f"[pipeline] {ticket_id} attempt {_attempt} failed: {box.get('error', 'timeout')}", flush=True)
     store.set_status(ticket_id, "error")  # both attempts timed out or crashed: visible, never silent
     return None
 
@@ -149,6 +152,10 @@ def _process(ticket_id: str, raw: dict):
             store.add_tag(ticket_id, tag)
         if (final.get("decision") or {}).get("action") == "escalate":
             _ack_escalation(ticket_id)
+    elif final is not None:
+        # graph finished but produced no ticket (e.g. intake rejected): surface it, never strand "processing"
+        print(f"[pipeline] {ticket_id} finished without a ticket: {(final.get('decision') or {}).get('reason')}", flush=True)
+        store.set_status(ticket_id, "error")
 
 
 def _reprocess(ticket_id: str, latest: str):
@@ -211,8 +218,8 @@ class EditIn(BaseModel):
     reply: str
 
 
-def dispatch_reply(state: dict, reply: str) -> str:
-    # send through the channel the ticket arrived on: email -> SMTP, everything else -> in-app thread
+def dispatch_reply(state: dict, reply: str, ticket_id: str) -> str:
+    # send through the channel the ticket arrived on: email -> SMTP, jira -> comment, else in-app
     t = state["ticket"]
     if t.get("source") == "email" and t.get("customer_email"):
         try:
@@ -220,6 +227,14 @@ def dispatch_reply(state: dict, reply: str) -> str:
             return "email_sent"
         except Exception as e:
             return f"email_failed: {e}"
+    if t.get("source") == "jira":
+        issue = store.get_jira_link(ticket_id)
+        if issue:
+            try:
+                jira_channel.post_comment(issue, reply)
+                return f"jira_comment:{issue}"
+            except Exception as e:
+                return f"jira_failed: {e}"
     return "in_app"
 
 
@@ -234,7 +249,7 @@ def approve_reply(ticket_id: str, user: User = Depends(require_staff)):
     delivery = None
     if decision.get("action") == "auto_send" and reply:
         store.append_message(ticket_id, "agent", reply)  # send: reply joins the thread
-        delivery = dispatch_reply(state, reply)  # and out through the source channel
+        delivery = dispatch_reply(state, reply, ticket_id)  # and out through the source channel
         store.set_lifecycle(ticket_id, "awaiting_customer")  # ball to the customer
         lifecycle = "awaiting_customer"
     else:
@@ -297,6 +312,31 @@ def email_sync(background: BackgroundTasks, user: User = Depends(require_staff))
     return {"fetched": len(emails), "skipped": skipped, "ticket_ids": created}
 
 
+@app.post("/jira/sync")
+def jira_sync(background: BackgroundTasks, user: User = Depends(require_staff)):
+    try:
+        issues = jira_channel.fetch_new()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"jira fetch failed: {e}")
+    created = []
+    for raw in issues:
+        ticket_id = f"T-{uuid.uuid4().hex[:8]}"
+        store.save_pending(
+            ticket_id,
+            raw["subject"],
+            raw["body"],
+            raw["source"],
+            raw["name"],
+            raw["email"],
+            datetime.now(timezone.utc),
+        )
+        store.add_jira_link(ticket_id, raw["issue_key"])
+        payload = {k: raw[k] for k in ("subject", "body", "source", "name", "email")}
+        background.add_task(_process, ticket_id, payload)
+        created.append({"ticket_id": ticket_id, "issue": raw["issue_key"]})
+    return {"fetched": len(issues), "tickets": created}
+
+
 class ResolveIn(BaseModel):
     csat: int | None = Field(default=None, ge=1, le=10)  # optional 1-10 star rating
 
@@ -316,6 +356,13 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
             "csat": csat,
         }
     store.set_lifecycle(ticket_id, "resolved")
+    jira_done = None
+    issue = store.get_jira_link(ticket_id)
+    if issue:
+        try:
+            jira_done = jira_channel.transition_done(issue)
+        except Exception:
+            jira_done = False  # their board lagging must never block our resolve
     # write-back the resolution we actually sent (last agent turn), quality-gated
     ticket = Ticket(**state["ticket"])
     agent_msgs = [m["body"] for m in state.get("messages", []) if m["role"] == "agent"]
@@ -327,6 +374,7 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
         "lifecycle": "resolved",
         "learned": out.get("learned", False),
         "csat": csat,
+        "jira_done": jira_done,
     }
 
 

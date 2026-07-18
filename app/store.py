@@ -89,6 +89,13 @@ def init_db():
         """)
 
         conn.execute("""
+        CREATE TABLE IF NOT EXISTS jira_links(
+            ticket_id TEXT PRIMARY KEY,
+            issue_key TEXT NOT NULL
+        )
+        """)
+
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS templates(
             id SERIAL PRIMARY KEY,
             name TEXT,
@@ -165,6 +172,20 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
                ON CONFLICT (ticket_id) DO NOTHING""",
             (ticket_id, subject, created_at, Jsonb(minimal), email),
         )
+
+
+def add_jira_link(ticket_id: str, issue_key: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO jira_links (ticket_id, issue_key) VALUES (%s, %s) ON CONFLICT (ticket_id) DO NOTHING",
+            (ticket_id, issue_key),
+        )
+
+
+def get_jira_link(ticket_id: str) -> str | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT issue_key FROM jira_links WHERE ticket_id = %s", (ticket_id,)).fetchone()
+        return row[0] if row else None
 
 
 def list_by_email(email: str) -> list[dict]:
