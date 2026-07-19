@@ -34,15 +34,7 @@ export default function Queue() {
 
   return (
     <main className="max-w-4xl mx-auto p-8">
-      <h1 className="text-2xl font-semibold mb-2">Ticket Queue</h1>
-      <div className="flex gap-4 mb-6 text-sm">
-        <Link
-          href="/workspace/metrics"
-          className="text-[var(--ox)] underline underline-offset-4"
-        >
-          Metrics
-        </Link>
-      </div>
+      <h1 className="text-2xl font-semibold mb-6">Ticket Queue</h1>
       <ul className="space-y-3">
         {tickets.map((t) => (
           <li key={t.ticket_id}>
