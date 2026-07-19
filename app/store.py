@@ -221,7 +221,9 @@ def list_all(status=None, category=None, tag=None, q=None) -> list[dict]:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
             f"""SELECT ticket_id, subject, category, priority, action,
-                              assignee, human_status,lifecycle, tags, created_at, due_at, (due_at IS NOT NULL AND due_at <now() AND lifecycle <> 'resolved') AS sla_breached
+                              assignee, human_status,lifecycle, tags, created_at, due_at, (due_at IS NOT NULL AND due_at <now() AND lifecycle <> 'resolved') AS sla_breached,
+                              state -> 'ticket' ->> 'source' AS source,
+                              left(state -> 'ticket' ->> 'body', 90) AS preview
                        FROM tickets {where} ORDER BY created_at DESC""",
             params,
         )
