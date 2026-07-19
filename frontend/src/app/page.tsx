@@ -1,24 +1,73 @@
 "use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useUser } from "@/lib/useUser";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { api } from "@/lib/api";
+import PortalShell from "./portal-shell";
 
-export default function Home() {
-  const { user, loading } = useUser();
-  const router = useRouter();
+type Req = { ticket_id: string; subject: string; human_status: string; lifecycle: string; created_at: string };
+
+function statusLine(r: Req): { text: string; tone: string } {
+  if (r.lifecycle === "resolved") return { text: "RESOLVED", tone: "text-[var(--olive)]" };
+  if (r.lifecycle === "awaiting_customer") return { text: "WE REPLIED · YOUR TURN", tone: "text-[var(--ox)]" };
+  if (r.human_status === "processing") return { text: "READING YOUR MESSAGE…", tone: "text-[var(--mut)]" };
+  return { text: "WITH OUR TEAM", tone: "text-[var(--mut)]" };
+}
+
+export default function PortalHome() {
+  const [reqs, setReqs] = useState<Req[] | null>(null);
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) router.replace("/login");
-    else if (user.role !== "customer") router.replace("/workspace");
-  }, [user, loading, router]);
+    const load = () => api("/my/tickets").then(setReqs).catch(() => setReqs([]));
+    load();
+    const i = setInterval(load, 5000);
+    return () => clearInterval(i);
+  }, []);
 
-  if (loading || !user || user.role !== "customer") {
-    return <main className="min-h-[100dvh] bg-[var(--paper)]" />;
-  }
   return (
-    <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
-      <p className="text-[var(--mut)]">The Nimbus help centre arrives in Step 5. You are signed in as {user.email}.</p>
-    </main>
+    <PortalShell>
+      {() => (
+        <>
+          <h1 className="text-[34px] font-extrabold leading-tight mt-4 rise" style={{ "--i": 0 } as React.CSSProperties}>
+            How can we help?
+          </h1>
+          <p className="text-[var(--mut)] mt-2 mb-8 max-w-[46ch] rise" style={{ "--i": 1 } as React.CSSProperties}>
+            Write to us any hour. Our system drafts the answer, a person signs off, and the reply comes back the way you sent it.
+          </p>
+          <div className="flex items-baseline border-t border-[var(--ink)] pt-5 rise" style={{ "--i": 2 } as React.CSSProperties}>
+            <h2 className="text-[19px] font-bold">Your requests</h2>
+            <Link
+              href="/new"
+              className="ml-auto bg-[var(--ox)] hover:bg-[var(--ox-2)] text-[var(--paper)] font-semibold text-[13px] px-4 py-2 rounded-[3px] active:scale-[0.98] transition"
+            >
+              + New request
+            </Link>
+          </div>
+          {!reqs ? (
+            <p className="py-6 text-[var(--mut)]">Loading…</p>
+          ) : reqs.length === 0 ? (
+            <p className="py-6 text-[var(--mut)]">Nothing yet. When you write to us, your requests live here.</p>
+          ) : (
+            <ul className="mt-2">
+              {reqs.map((r, i) => {
+                const st = statusLine(r);
+                return (
+                  <li key={r.ticket_id} className="rise" style={{ "--i": i + 3 } as React.CSSProperties}>
+                    <Link
+                      href={`/requests/${r.ticket_id}`}
+                      className="block py-4 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:pl-3 transition-all"
+                    >
+                      <span className="block font-semibold text-[15.5px]">{r.subject}</span>
+                      <span className={`font-array text-[10.5px] ${st.tone}`}>
+                        {st.text} · OPENED {new Date(r.created_at).toLocaleDateString()}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </PortalShell>
   );
 }

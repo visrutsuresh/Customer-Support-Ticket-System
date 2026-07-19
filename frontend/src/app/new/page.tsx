@@ -1,68 +1,63 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import PortalShell from "../portal-shell";
 
-export default function NewTicket() {
+export default function NewRequest() {
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
-    const form = new FormData(e.currentTarget);
-    await fetch("http://localhost:8000/tickets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject: form.get("subject"),
-        body: form.get("body"),
-        source: "form",
-        name: form.get("name"),
-        email: form.get("email"),
-      }),
-    });
-    router.push("/");
+    setBusy(true);
+    setError("");
+    try {
+      await api("/tickets", { method: "POST", body: JSON.stringify({ subject, body, source: "form" }) });
+      router.push("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setBusy(false);
+    }
   }
+
   return (
-    <main className="max-w-xl mx-auto p-8 space-y-4">
-      <a href="/" className="text-sm text-blue-600">
-        ← Back to queue
-      </a>
-      <h1 className="text-2xl font-semibold">New ticket</h1>
-      <form onSubmit={submit} className="space-y-3">
-        <input
-          name="subject"
-          placeholder="Subject"
-          required
-          className="w-full border rounded p-2"
-        />
-        <textarea
-          name="body"
-          placeholder="Message"
-          required
-          className="w-full border rounded p-2 h-32"
-        />
-        <input
-          name="name"
-          placeholder="Customer name"
-          required
-          className="w-full border rounded p-2"
-        />
-        <input
-          name="email"
-          type="email"
-          placeholder="Customer email"
-          required
-          className="w-full border rounded p-2"
-        />
-        <button
-          disabled={submitting}
-          className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-50"
-        >
-          {submitting ? "Submitting..." : "Submit"}
-        </button>
-      </form>
-    </main>
+    <PortalShell>
+      {() => (
+        <form onSubmit={submit} className="border-t-2 border-[var(--ink)] pt-6 mt-4">
+          <h1 className="text-[24px] font-bold mb-6">New request</h1>
+          <label className="block font-array text-[10.5px] text-[var(--mut)] mb-1">SUBJECT</label>
+          <input
+            required
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--ox)] outline-none py-2 mb-6 text-[15px]"
+          />
+          <label className="block font-array text-[10.5px] text-[var(--mut)] mb-1">WHAT&apos;S GOING ON?</label>
+          <textarea
+            required
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="w-full bg-white border border-[var(--line)] focus:border-[var(--ox)] outline-none rounded-[3px] p-3 h-40 text-[14px] leading-relaxed"
+          />
+          {error && <p className="text-sm text-[var(--rust)] mt-3">{error}</p>}
+          <div className="flex gap-4 items-center mt-5">
+            <button
+              type="submit"
+              disabled={busy}
+              className="bg-[var(--ox)] hover:bg-[var(--ox-2)] text-[var(--paper)] font-semibold text-[13.5px] px-6 py-2.5 rounded-[3px] active:scale-[0.98] transition disabled:opacity-50"
+            >
+              {busy ? "Sending…" : "Send request"}
+            </button>
+            <button type="button" onClick={() => router.push("/")} className="text-[13.5px] text-[var(--mut)] underline underline-offset-4">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </PortalShell>
   );
 }
