@@ -3,22 +3,22 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/lib/useUser";
 
-export default function Home() {
+export default function WorkspaceLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, loading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
     if (!user) router.replace("/login");
-    else if (user.role !== "customer") router.replace("/workspace");
+    else if (user.role === "customer") router.replace("/");
   }, [user, loading, router]);
 
-  if (loading || !user || user.role !== "customer") {
+  if (loading || !user || user.role === "customer") {
     return <main className="min-h-[100dvh] bg-[var(--paper)]" />;
   }
-  return (
-    <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
-      <p className="text-[var(--mut)]">The Nimbus help centre arrives in Step 5. You are signed in as {user.email}.</p>
-    </main>
-  );
+  return <>{children}</>;
 }

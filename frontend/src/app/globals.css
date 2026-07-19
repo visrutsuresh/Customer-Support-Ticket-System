@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
+/* Ledger is a light, printed-paper design: one look in every OS theme */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: var(--paper);
+  --foreground: var(--ink);
 }
 
 @theme inline {
@@ -12,15 +13,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+:root {
+  --paper: #f6f3eb;
+  --paper-2: #efebdf;
+  --ink: #1f0808;
+  --ox: #541a1a;
+  --ox-2: #6e2a2a;
+  --line: #dcd5c4;
+  --mut: #867b69;
+  --olive: #4a5530;
+  --rust: #8b4a2e;
 }
