@@ -1,4 +1,4 @@
-"""Seed the three staff accounts. Idempotent: run any time."""
+"""Seed the staff accounts plus a demo customer. Idempotent: run any time."""
 import asyncio
 
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ SEEDS = [
     ("admin@nimbus.dev", "admin-dev-password", "admin"),
     ("dana@nimbus.dev", "staff-dev-password", "staff"),
     ("marco@nimbus.dev", "staff-dev-password", "staff"),
+    ("customer@nimbus.dev", "customer-dev-password", "customer"),
 ]
 
 
