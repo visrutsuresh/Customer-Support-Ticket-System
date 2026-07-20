@@ -16,6 +16,7 @@ type Ticket = {
   sla_breached: boolean;
   source: string | null;
   preview: string | null;
+  created_at: string | null;
 };
 
 const SOURCE_GLYPH: Record<string, string> = {
@@ -43,6 +44,8 @@ function statusView(s: string): { label: string; dot: string; pulse: boolean } {
       return { label: "PROCESSING", dot: "bg-[var(--mut)]", pulse: true };
     case "approved":
       return { label: "APPROVED", dot: "bg-[var(--olive)]", pulse: false };
+    case "sent":
+      return { label: "SENT", dot: "bg-[var(--olive)]", pulse: false };
     case "edited":
       return { label: "EDITED", dot: "bg-[var(--olive)]", pulse: false };
     case "rejected":
@@ -60,12 +63,14 @@ export default function Queue() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
+  const [scope, setScope] = useState("live");
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (status) params.set("status", status);
     if (category) params.set("category", category);
+    if (scope !== "live") params.set("scope", scope);
     const load = () =>
       api(`/tickets?${params}`)
         .then(setTickets)
@@ -73,7 +78,7 @@ export default function Queue() {
     load();
     const i = setInterval(load, 4000);
     return () => clearInterval(i);
-  }, [q, status, category]);
+  }, [q, status, category, scope]);
 
   if (error) return <main className="p-8 text-[var(--rust)]">{error}</main>;
 
@@ -93,6 +98,22 @@ export default function Queue() {
         )}
       </div>
 
+      <div className="flex gap-1 mt-4">
+        {["live", "archive", "all"].map((s) => (
+          <button
+            key={s}
+            onClick={() => setScope(s)}
+            className={`font-array text-[11px] px-3 py-1.5 rounded-[3px] border transition-colors ${
+              scope === s
+                ? "bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]"
+                : "text-[var(--mut)] border-[var(--line)] hover:border-[var(--ink)]"
+            }`}
+          >
+            {s.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       <div
         className="flex items-center border-t border-[var(--ink)] border-b border-b-[var(--line)] mt-4 mb-1 rise"
         style={{ "--i": 1 } as React.CSSProperties}
@@ -109,9 +130,12 @@ export default function Queue() {
           className="font-array text-[11px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
         >
           <option value="">STATUS</option>
-          <option value="pending">PENDING</option>
+          <option value="pending">NEEDS REVIEW</option>
           <option value="processing">PROCESSING</option>
           <option value="approved">APPROVED</option>
+          <option value="sent">SENT</option>
+          <option value="edited">EDITED</option>
+          <option value="rejected">REJECTED</option>
           <option value="error">ERROR</option>
         </select>
         <select
@@ -144,7 +168,7 @@ export default function Queue() {
               >
                 <Link
                   href={`/workspace/tickets/${t.ticket_id}`}
-                  className="grid grid-cols-[48px_1fr_150px_80px_130px] gap-4 items-center py-4 px-1 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:pl-3 transition-all"
+                  className="grid grid-cols-[48px_1fr_120px_140px_80px_70px_110px] gap-4 items-center py-4 px-1 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:pl-3 transition-all"
                 >
                   <span className="font-array text-[10.5px] text-[var(--mut)] leading-relaxed">
                     {SOURCE_GLYPH[t.source ?? ""] ?? "▤"}{" "}
@@ -162,6 +186,9 @@ export default function Queue() {
                       </span>
                     )}
                   </span>
+                  <span className="font-array text-[10.5px] text-[var(--mut)]">
+                    {(t.tags ?? []).slice(0, 3).join(" · ").toUpperCase() || "—"}
+                  </span>
                   <span
                     className={`font-array text-[11px] flex items-center gap-2 ${st.label === "NEEDS REVIEW" ? "text-[var(--ox)]" : st.label === "ERROR" || st.label === "REJECTED" ? "text-[var(--rust)]" : "text-[var(--mut)]"}`}
                   >
@@ -174,6 +201,13 @@ export default function Queue() {
                     className={`font-array text-[10.5px] ${t.priority?.toLowerCase() === "high" ? "text-[var(--ox)] font-semibold" : t.priority?.toLowerCase() === "critical" ? "bg-[var(--ox)] text-[var(--paper)] px-2 py-0.5 rounded-[2px] justify-self-start" : "text-[var(--mut)]"}`}
                   >
                     {(t.priority ?? "—").toUpperCase()}
+                  </span>
+                  <span className="font-array text-[10.5px] text-[var(--mut)] tabular-nums">
+                    {t.created_at
+                      ? new Date(t.created_at)
+                          .toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
+                          .toUpperCase()
+                      : "—"}
                   </span>
                   <span
                     className={`font-array text-[11px] tabular-nums ${sla.breached ? "text-[var(--rust)] font-semibold" : "text-[var(--mut)]"}`}

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import Actions from "./actions";
@@ -13,20 +13,32 @@ type State = {
   draft: { reply?: string; confidence?: number };
   messages?: Msg[];
   tags?: string[];
+  lifecycle?: string;
 };
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [s, setS] = useState<State | null>(null);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [newTag, setNewTag] = useState("");
 
   const load = useCallback(() => {
-    api(`/tickets/${id}`).then(setS).catch((e) => setError(String(e)));
-  }, [id]);
+    api(`/tickets/${id}`)
+      .then(setS)
+      .catch((e) => {
+        // resolved tickets are refiled T-x -> HIST-x; follow the id to its archived twin
+        if (id.startsWith("T-")) router.replace(`/workspace/tickets/HIST-${id.slice(2)}`);
+        else setError(String(e));
+      });
+  }, [id, router]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    const i = setInterval(load, 4000); // keep in sync with the other side's resolve
+    return () => clearInterval(i);
+  }, [load]);
 
   async function addNote() {
     if (!note.trim()) return;
@@ -51,6 +63,7 @@ export default function TicketDetail() {
   if (!s) return <main className="p-8 text-[var(--mut)]">Loading…</main>;
 
   const conf = s.decision.confidence ?? s.draft.confidence;
+  const locked = s.lifecycle === "resolved";
   const who = (m: Msg) =>
     m.role === "customer" ? (s.ticket.customer_name ?? "CUSTOMER") : m.role === "internal" ? "INTERNAL NOTE" : "NIMBUS SUPPORT";
 
@@ -103,6 +116,7 @@ export default function TicketDetail() {
               </p>
             </div>
           ))}
+          {!locked && (
           <div className="flex gap-2 pt-2">
             <input
               value={note}
@@ -118,6 +132,7 @@ export default function TicketDetail() {
               Note
             </button>
           </div>
+          )}
         </div>
 
         {/* AI panel */}
@@ -140,7 +155,11 @@ export default function TicketDetail() {
           {s.decision.reason && (
             <div className="font-array text-[10.5px] text-[var(--mut)] mb-3">GROUNDS: {s.decision.reason.toUpperCase()}</div>
           )}
-          <Actions id={id} reply={s.draft.reply ?? ""} />
+          {locked ? (
+            <p className="font-array text-[11px] text-[var(--olive)] mt-3">RESOLVED · THIS TICKET IS LOCKED</p>
+          ) : (
+            <Actions id={id} reply={s.draft.reply ?? ""} />
+          )}
           <div className="border-t border-[var(--line)] mt-6 pt-4">
             <span className="font-array text-[10.5px] text-[var(--mut)]">TAGS</span>
             <div className="mt-2 flex flex-wrap gap-2 items-center">
@@ -150,18 +169,22 @@ export default function TicketDetail() {
                   className="font-array text-[11px] border border-[var(--line)] rounded-[2px] px-2.5 py-1 hover:border-[var(--ox)] transition-colors"
                 >
                   {tag.toUpperCase()}
-                  <button onClick={() => removeTag(tag)} className="ml-1.5 text-[var(--rust)]">
-                    ×
-                  </button>
+                  {!locked && (
+                    <button onClick={() => removeTag(tag)} className="ml-1.5 text-[var(--rust)]">
+                      ×
+                    </button>
+                  )}
                 </span>
               ))}
-              <input
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addTag()}
-                placeholder="+ TAG"
-                className="font-array text-[11px] w-20 bg-transparent border border-dashed border-[var(--line)] focus:border-[var(--ox)] rounded-[2px] px-2.5 py-1 outline-none placeholder:text-[var(--mut)]"
-              />
+              {!locked && (
+                <input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addTag()}
+                  placeholder="+ TAG"
+                  className="font-array text-[11px] w-20 bg-transparent border border-dashed border-[var(--line)] focus:border-[var(--ox)] rounded-[2px] px-2.5 py-1 outline-none placeholder:text-[var(--mut)]"
+                />
+              )}
             </div>
           </div>
         </div>

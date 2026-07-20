@@ -9,7 +9,12 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
   const [delivery, setDelivery] = useState("");
 
   async function act(kind: string) {
-    const out = await api(`/tickets/${id}/${kind}`, { method: "POST" });
+    let out = null;
+    try {
+      out = await api(`/tickets/${id}/${kind}`, { method: "POST" });
+    } catch {
+      // resolve renames the id and the page can redirect mid-flight; land on the queue either way
+    }
     if (out?.delivery) {
       setDelivery(`Delivered: ${out.delivery}`); // show how it left the building before we bounce
       setTimeout(() => router.push("/workspace"), 1200);
@@ -48,6 +53,12 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
           className="text-[var(--rust)] font-semibold text-[13px] px-3 py-2.5 hover:underline underline-offset-4"
         >
           Reject
+        </button>
+        <button
+          onClick={() => act("resolve")}
+          className="ml-auto text-[var(--olive)] border border-[var(--olive)] font-semibold text-[13px] px-4 py-2.5 rounded-[3px] hover:bg-[var(--olive)] hover:text-[var(--paper)] transition-colors"
+        >
+          Mark resolved
         </button>
       </div>
       {delivery && <p className="font-array text-[11px] text-[var(--olive)] mt-3">{delivery.toUpperCase()}</p>}

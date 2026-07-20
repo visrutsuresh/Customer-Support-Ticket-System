@@ -123,6 +123,8 @@ def init_db():
 
 def save(state: dict) -> None:
     t = state["ticket"]
+    if is_historical(t.ticket_id):
+        return  # resolved + refiled while the pipeline ran: never resurrect a zombie
     c = state.get("classification", {})
     d = state.get("decision", {})
     assignee = (d.get("assignee") or {}).get("name")
@@ -164,6 +166,7 @@ def save_pending(ticket_id, subject, body, source, name, email, created_at) -> N
         "classification": {},
         "decision": {},
         "draft": {},
+        "messages": [{"role": "customer", "body": body}],  # visible in the portal thread immediately, not only after the pipeline saves
     }
     with _connect() as conn:
         conn.execute(
@@ -189,7 +192,8 @@ def get_jira_link(ticket_id: str) -> str | None:
 
 
 def list_by_email(email: str) -> list[dict]:
-    # the customer portal's "my requests": tickets born from this email, newest first
+    # the customer portal's "my requests": tickets born from this email, newest first.
+    # a ticket can exist as both T-x and HIST-x (old zombie rows); the archived one wins.
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
         cur.execute(
@@ -198,11 +202,23 @@ def list_by_email(email: str) -> list[dict]:
                ORDER BY created_at DESC""",
             (email,),
         )
-        return cur.fetchall()
+        rows = cur.fetchall()
+    winner = {}
+    for r in rows:
+        sfx = r["ticket_id"].split("-", 1)[-1]
+        if sfx not in winner or r["ticket_id"].startswith("HIST-"):
+            winner[sfx] = r["ticket_id"]
+    return [r for r in rows if winner[r["ticket_id"].split("-", 1)[-1]] == r["ticket_id"]]
 
 
-def list_all(status=None, category=None, tag=None, q=None) -> list[dict]:
+def list_all(status=None, category=None, tag=None, q=None, scope="live") -> list[dict]:
     clauses, params = ["merged_into IS NULL"], []
+    if scope == "live":
+        clauses.append("ticket_id NOT LIKE %s")
+        params.append("HIST-%")
+    elif scope == "archive":
+        clauses.append("ticket_id LIKE %s")
+        params.append("HIST-%")
     if status:
         clauses.append("human_status =%s")
         params.append(status)
@@ -274,6 +290,23 @@ def edit_reply(ticket_id: str, new_reply: str) -> bool:
             (new_reply, ticket_id),
         )
         return cur.rowcount > 0
+
+
+def replace_last_agent_message(ticket_id: str, body: str) -> bool:
+    # retcon the newest agent turn: used when staff edit a reply that was already auto-sent
+    with _connect() as conn:
+        cur = conn.cursor(row_factory=dict_row)
+        cur.execute("SELECT state -> 'messages' AS m FROM tickets WHERE ticket_id = %s", (ticket_id,))
+        row = cur.fetchone()
+        if row is None or not row["m"]:
+            return False
+        msgs = row["m"]
+        for i in range(len(msgs) - 1, -1, -1):
+            if msgs[i]["role"] == "agent":
+                msgs[i]["body"] = body
+                conn.execute("UPDATE tickets SET state = jsonb_set(state, '{messages}', %s) WHERE ticket_id = %s", (Jsonb(msgs), ticket_id))
+                return True
+    return False
 
 
 def metrics() -> dict:
@@ -469,6 +502,13 @@ def past_tickets(email: str) -> list[dict]:
             (email,),
         )
         return [{"subject": r["subject"], "resolution": (r["state"] or {}).get("resolution", "")} for r in cur.fetchall()]
+
+
+def is_historical(ticket_id: str) -> bool:
+    # has this ticket already been refiled under HIST-? if so its T- life is over
+    hist_id = "HIST-" + ticket_id.split("-", 1)[-1]
+    with _connect() as conn:
+        return conn.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (hist_id,)).fetchone() is not None
 
 
 def file_as_history(ticket_id: str) -> str:

@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -112,11 +113,16 @@ def _ack_escalation(ticket_id: str) -> None:
 
 PIPELINE_TIMEOUT_S = 180  # same wall-clock cap bench.py uses
 
+_CANCELLED: set[str] = set()  # resolve marks a ticket doomed; in-flight runs check here before working
+
 
 def _invoke_guarded(ticket_id: str, initial: dict):
     # run the graph with a hard time cap so one hung ticket can't jam the background queue.
     # two attempts: a timeout is usually a Modal cold start, and the retry hits a warm container.
     for _attempt in (1, 2):
+        if ticket_id in _CANCELLED:
+            print(f"[pipeline] {ticket_id} cancelled by resolve", flush=True)
+            return None
         print(f"[pipeline] {ticket_id} attempt {_attempt} start", flush=True)
         box = {}
 
@@ -137,6 +143,33 @@ def _invoke_guarded(ticket_id: str, initial: dict):
     return None
 
 
+_HUMAN_RE = re.compile(r"\b(human|real person|representative|live agent|speak to someone|talk to someone)\b", re.I)
+
+
+def _wants_human(text: str) -> bool:
+    return bool(_HUMAN_RE.search(text or ""))
+
+
+def _auto_dispatch(ticket_id: str) -> None:
+    # auto_send means SEND: the reply leaves immediately, no human click.
+    # an explicit "get me a human" always parks at NEEDS REVIEW instead.
+    state = store.get(ticket_id)
+    if state is None:
+        return
+    customer_turns = [m["body"] for m in state.get("messages", []) if m["role"] == "customer"]
+    if customer_turns and _wants_human(customer_turns[-1]):
+        store.set_status(ticket_id, "pending")
+        _ack_escalation(ticket_id)
+        return
+    reply = (state.get("draft") or {}).get("reply", "")
+    if (state.get("decision") or {}).get("action") != "auto_send" or not reply.strip():
+        return
+    store.append_message(ticket_id, "agent", reply)
+    dispatch_reply(state, reply, ticket_id)
+    store.set_lifecycle(ticket_id, "awaiting_customer")
+    store.set_status(ticket_id, "sent")
+
+
 def _process(ticket_id: str, raw: dict):
     final = _invoke_guarded(
         ticket_id,
@@ -146,12 +179,16 @@ def _process(ticket_id: str, raw: dict):
             "audit": [],
         },
     )
+    if ticket_id in _CANCELLED:
+        return
     if final and final.get("ticket") is not None:
         store.save(final)
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
         if (final.get("decision") or {}).get("action") == "escalate":
             _ack_escalation(ticket_id)
+        else:
+            _auto_dispatch(ticket_id)
     elif final is not None:
         # graph finished but produced no ticket (e.g. intake rejected): surface it, never strand "processing"
         print(f"[pipeline] {ticket_id} finished without a ticket: {(final.get('decision') or {}).get('reason')}", flush=True)
@@ -159,6 +196,11 @@ def _process(ticket_id: str, raw: dict):
 
 
 def _reprocess(ticket_id: str, latest: str):
+    if _wants_human(latest):
+        # the customer asked for a person: no model run, straight to the review queue
+        store.set_status(ticket_id, "pending")
+        _ack_escalation(ticket_id)
+        return
     prior = store.get(ticket_id)  # has the just appended customer turn + original ticket info
     t = prior["ticket"]
     raw = {
@@ -170,12 +212,16 @@ def _reprocess(ticket_id: str, latest: str):
         "email": t.get("customer_email"),
     }
     final = _invoke_guarded(ticket_id, {"raw_input": raw, "messages": prior.get("messages", []), "audit": []})
+    if ticket_id in _CANCELLED:
+        return
     if final and final.get("ticket") is not None:
         store.save(final)
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
         if (final.get("decision") or {}).get("action") == "escalate":
             _ack_escalation(ticket_id)
+        else:
+            _auto_dispatch(ticket_id)
 
 
 def _require_ticket_access(ticket_id: str, user: User) -> dict:
@@ -186,6 +232,12 @@ def _require_ticket_access(ticket_id: str, user: User) -> dict:
     if user.role == "customer" and (state["ticket"].get("customer_email") or "").lower() != user.email.lower():
         raise HTTPException(status_code=403, detail="not your ticket")
     return state
+
+
+def _require_open(state: dict) -> None:
+    # a resolved ticket is locked: no approve/reject/edit/note/tag/reply ever again
+    if state.get("lifecycle") == "resolved":
+        raise HTTPException(status_code=409, detail="ticket is resolved and locked")
 
 
 @app.get("/my/tickets")
@@ -201,9 +253,10 @@ def list_tickets(
     category: str | None = None,
     tag: str | None = None,
     q: str | None = None,
+    scope: str = "live",
     user: User = Depends(require_staff),
 ):
-    return store.list_all(status=status, category=category, tag=tag, q=q)
+    return store.list_all(status=status, category=category, tag=tag, q=q, scope=scope)
 
 
 @app.get("/tickets/{ticket_id}")
@@ -243,11 +296,11 @@ def approve_reply(ticket_id: str, user: User = Depends(require_staff)):
     state = store.get(ticket_id)
     if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
-    decision = state.get("decision") or {}
+    _require_open(state)
     reply = (state.get("draft") or {}).get("reply", "")
     store.set_status(ticket_id, "approved")
     delivery = None
-    if decision.get("action") == "auto_send" and reply:
+    if reply:  # approve sends whatever draft exists, escalated or not (the old auto_send-only check sent nothing on escalations)
         store.append_message(ticket_id, "agent", reply)  # send: reply joins the thread
         delivery = dispatch_reply(state, reply, ticket_id)  # and out through the source channel
         store.set_lifecycle(ticket_id, "awaiting_customer")  # ball to the customer
@@ -259,15 +312,27 @@ def approve_reply(ticket_id: str, user: User = Depends(require_staff)):
 
 @app.post("/tickets/{ticket_id}/reject")
 def reject_reply(ticket_id: str, user: User = Depends(require_staff)):
-    if not store.set_status(ticket_id, "rejected"):
+    state = store.get(ticket_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
+    _require_open(state)
+    store.set_status(ticket_id, "rejected")
     return {"ticket_id": ticket_id, "human_status": "rejected"}
 
 
 @app.post("/tickets/{ticket_id}/edit")
 def edit_reply(ticket_id: str, payload: EditIn, user: User = Depends(require_staff)):
-    if not store.edit_reply(ticket_id, payload.reply):
+    state = store.get(ticket_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
+    _require_open(state)
+    store.edit_reply(ticket_id, payload.reply)
+    if state.get("human_status") == "sent":
+        # already auto-sent: the edit rewrites the sent message in the thread, status stays sent.
+        # ceiling: an email/jira copy already left the building; only the thread record is corrected.
+        store.replace_last_agent_message(ticket_id, payload.reply)
+        store.set_status(ticket_id, "sent")
+        return {"ticket_id": ticket_id, "human_status": "sent", "edited_sent_message": True}
     return {"ticket_id": ticket_id, "human_status": "edited"}
 
 
@@ -282,7 +347,8 @@ class ReplyIn(BaseModel):
 
 @app.post("/tickets/{ticket_id}/reply")
 def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks, user: User = Depends(current_user)):
-    _require_ticket_access(ticket_id, user)
+    state = _require_ticket_access(ticket_id, user)
+    _require_open(state)
     store.append_message(ticket_id, "customer", payload.body)  # message thread grows & lifecycle -> open
     background.add_task(_reprocess, ticket_id, payload.body)
     return {"ticket_id": ticket_id, "status": "processing"}
@@ -356,6 +422,7 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
             "csat": csat,
         }
     store.set_lifecycle(ticket_id, "resolved")
+    _CANCELLED.add(ticket_id)  # kill any in-flight pipeline run for this ticket
     jira_done = None
     issue = store.get_jira_link(ticket_id)
     if issue:
@@ -363,12 +430,17 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
             jira_done = jira_channel.transition_done(issue)
         except Exception:
             jira_done = False  # their board lagging must never block our resolve
+    new_id = store.file_as_history(ticket_id)  # archive FIRST: a KB failure must never strand a ticket
     # write-back the resolution we actually sent (last agent turn), quality-gated
     ticket = Ticket(**state["ticket"])
     agent_msgs = [m["body"] for m in state.get("messages", []) if m["role"] == "agent"]
     resolution = agent_msgs[-1] if agent_msgs else (state.get("draft") or {}).get("reply", "")
-    out = learn_agent(ticket, resolution, resolved=True)
-    new_id = store.file_as_history(ticket_id)  # resolved -> past ticket, re-filed under the HIST- prefix
+    try:
+        # nothing to learn from a ticket resolved before any agent reply; skip the LLM call
+        out = learn_agent(ticket, resolution, resolved=True) if resolution.strip() else {"learned": False}
+    except Exception as e:
+        print(f"[resolve] learn failed for {new_id}: {e}", flush=True)
+        out = {"learned": False}
     return {
         "ticket_id": new_id,
         "lifecycle": "resolved",
@@ -384,16 +456,20 @@ class TagIn(BaseModel):
 
 @app.post("/tickets/{ticket_id}/tags")
 def add_ticket_tag(ticket_id: str, payload: TagIn, user: User = Depends(require_staff)):
-    if store.get(ticket_id) is None:
+    state = store.get(ticket_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
+    _require_open(state)
     store.add_tag(ticket_id, payload.tag)
     return {"ticket_id": ticket_id, "tag": payload.tag, "added": True}
 
 
 @app.delete("/tickets/{ticket_id}/tags/{tag}")
 def remove_ticket_tag(ticket_id: str, tag: str, user: User = Depends(require_staff)):
-    if store.get(ticket_id) is None:
+    state = store.get(ticket_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
+    _require_open(state)
     store.remove_tag(ticket_id, tag)
     return {"ticket_id": ticket_id, "tag": tag, "removed": True}
 
@@ -404,8 +480,10 @@ class NoteIn(BaseModel):
 
 @app.post("/tickets/{ticket_id}/note")
 def add_internal_note(ticket_id: str, payload: NoteIn, user: User = Depends(require_staff)):
-    if store.get(ticket_id) is None:
+    state = store.get(ticket_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
+    _require_open(state)
     store.append_message(ticket_id, "internal", payload.body)
     return {"ticket_id": ticket_id, "role": "internal", "added": True}
 

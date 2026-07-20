@@ -20,17 +20,26 @@ export default function RequestThread() {
   const load = useCallback(() => {
     api(`/tickets/${id}/thread`)
       .then((t) => setMsgs(t.messages))
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        // a T- id dies when staff resolve it; the my/tickets branch below redirects to the HIST- twin
+        if (!id.startsWith("T-")) setError(String(e));
+      });
     api("/my/tickets")
       .then((list: { ticket_id: string; subject: string; lifecycle: string }[]) => {
-        const mine = list.find((r) => r.ticket_id === id);
+        const mine =
+          list.find((r) => r.ticket_id === id) ??
+          (id.startsWith("T-") ? list.find((r) => r.ticket_id === `HIST-${id.slice(2)}`) : undefined);
+        if (mine && mine.ticket_id !== id) {
+          router.replace(`/requests/${mine.ticket_id}`);
+          return;
+        }
         if (mine) {
           setSubject(mine.subject);
           setResolved(mine.lifecycle === "resolved");
         }
       })
       .catch(() => {});
-  }, [id]);
+  }, [id, router]);
 
   useEffect(() => {
     load();
@@ -46,7 +55,11 @@ export default function RequestThread() {
   }
 
   async function resolve(csat: number) {
-    await api(`/tickets/${id}/resolve`, { method: "POST", body: JSON.stringify({ csat }) });
+    try {
+      await api(`/tickets/${id}/resolve`, { method: "POST", body: JSON.stringify({ csat }) });
+    } catch {
+      // id can die mid-flight (T- renamed to HIST- by a racing resolve); home shows the truth either way
+    }
     router.push("/");
   }
 
