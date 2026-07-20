@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.state import Ticket
 
@@ -21,6 +21,6 @@ def normalize(raw: dict) -> Ticket:
         customer_id=raw.get("customer_id"),
         customer_name=raw.get("name") or raw.get("customer_name"),
         customer_email=raw.get("email"),
-        created_at=datetime.now(),
+        created_at=datetime.now(timezone.utc),  # aware UTC; naive local time here skewed sort order and SLA clocks by +8h
         raw=raw,
     )
