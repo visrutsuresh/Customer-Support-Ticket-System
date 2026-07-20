@@ -229,6 +229,7 @@ def generate(state: State) -> dict:
     On that same control line, after the KIND word, add "CONFIDENCE: N" where N is 0-100 = how sure you are the answer is correct AND complete from the knowledge base above (be honest; partial coverage = lower). Example: "KIND: answer CONFIDENCE: 85".
 
     Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Nimbus Support Team'. Sound helpful and warm.
+    VOICE RULE: you are writing directly TO the customer. Address them as "you". Never refer to them in the third person ("the customer", "they"), never write phrases like "Based on the knowledge base" or "suggest the customer", and rewrite any internal guidance into natural, direct instructions to the reader.
     """
 
     r = state["routing"]
@@ -278,6 +279,9 @@ def review(state: State) -> dict:
     Check the reply against the numbered policy rules below. FAIL only if the reply text clearly
     breaks a rule. Asking the customer for their email, order number, or more information is
     allowed and PASSES. When unsure, PASS.
+    ALSO FAIL on quality: the reply addresses the customer in the third person ("the customer",
+    "they" meaning the reader), copies internal guidance verbatim ("Based on the knowledge base",
+    "suggest the customer"), or reads like internal notes instead of a letter to the customer.
 
     Policy:
     {policy}

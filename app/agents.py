@@ -148,6 +148,9 @@ def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str
     Use the guidance from triage above and these knowledge base articles. Do not invent details beyond what they contain:
     {kb_text}
     Open with exactly "{greeting}" and sign off as 'The Nimbus Support Team'. No placeholders like [NAME.
+    VOICE RULE: you are writing directly TO the customer. Address them as "you". Never refer to them in the
+    third person ("the customer", "they"), never write phrases like "Based on the knowledge base" or
+    "suggest the customer", and rewrite any internal guidance into natural, direct instructions to the reader.
     """
     return router.generate_reply(prompt, lane, tier)
 
@@ -221,7 +224,11 @@ Reply every turn with ONE JSON object, nothing else.
   To use a tool: {"thought":"...","action":"<tool>","args":{...}}
   To finish:       {"thought":"...","action":"finish","result":{"verdict":"pass|fail","issues":["<reason>", ...]}}
 FAIL if the reply breaks a policy rule, or states something about the customer's account/orders
-that the CRM contradicts. Asking the customer for information is allowed and PASSES. When unsure, PASS.
+that the CRM contradicts. ALSO FAIL on quality: the reply addresses the customer in the third person
+("the customer", "they" meaning the reader), copies internal guidance verbatim ("Based on the knowledge
+base", "suggest the customer"), or reads like internal notes instead of a letter to the customer.
+Asking the customer for information is allowed and PASSES. When unsure about facts, PASS; when the
+voice is clearly wrong, FAIL.
 """
 
 
