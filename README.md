@@ -72,6 +72,25 @@ cd ..
 
 ---
 
+## Sign in (seeded dev accounts)
+
+Create the accounts once (idempotent, needs the DB up):
+
+```bash
+uv run python seed_users.py
+```
+
+| Email | Password | Role |
+|---|---|---|
+| `admin@nimbus.dev` | `admin-dev-password` | admin |
+| `dana@nimbus.dev` | `staff-dev-password` | staff |
+| `marco@nimbus.dev` | `staff-dev-password` | staff |
+| `customer@nimbus.dev` | `customer-dev-password` | customer |
+
+Rotate these before the API is reachable by anyone else.
+
+---
+
 ## Run it (everyday, two terminals)
 
 **Terminal 1: backend API**
