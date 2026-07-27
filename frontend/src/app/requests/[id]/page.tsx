@@ -16,6 +16,7 @@ export default function RequestThread() {
   const [reply, setReply] = useState("");
   const [rating, setRating] = useState(false);
   const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
 
   const load = useCallback(() => {
     api(`/tickets/${id}/thread`)
@@ -25,7 +26,7 @@ export default function RequestThread() {
         if (!id.startsWith("T-")) setError(String(e));
       });
     api("/my/tickets")
-      .then((list: { ticket_id: string; subject: string; lifecycle: string }[]) => {
+      .then((list: { ticket_id: string; subject: string; lifecycle: string; human_status?: string }[]) => {
         const mine =
           list.find((r) => r.ticket_id === id) ??
           (id.startsWith("T-") ? list.find((r) => r.ticket_id === `HIST-${id.slice(2)}`) : undefined);
@@ -36,6 +37,7 @@ export default function RequestThread() {
         if (mine) {
           setSubject(mine.subject);
           setResolved(mine.lifecycle === "resolved");
+          setWorking(mine.human_status === "processing");
         }
       })
       .catch(() => {});
@@ -52,6 +54,11 @@ export default function RequestThread() {
     await api(`/tickets/${id}/reply`, { method: "POST", body: JSON.stringify({ body: reply }) });
     setReply("");
     load();
+  }
+
+  async function reopenRequest() {
+    const out = await api(`/my/tickets/${id}/reopen`, { method: "POST" });
+    router.replace(`/requests/${out.ticket_id}`);
   }
 
   async function resolve(csat: number) {
@@ -91,6 +98,15 @@ export default function RequestThread() {
                   </p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {working && (
+            <div className="mt-8 max-w-[58ch]">
+              <span className="workbar w-full" />
+              <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">
+                WE ARE WORKING ON YOUR REQUEST. THIS USUALLY TAKES A MINUTE OR TWO.
+              </p>
             </div>
           )}
 
@@ -138,7 +154,20 @@ export default function RequestThread() {
             </div>
           )}
 
-          {resolved && <p className="mt-10 font-array text-[11px] text-[var(--olive)]">RESOLVED · THANKS FOR WRITING IN</p>}
+          {resolved && (
+            <div className="mt-10">
+              <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THANKS FOR WRITING IN</p>
+              <p className="text-[13.5px] text-[var(--mut)] mt-3 max-w-[52ch]">
+                Not what you needed? Reopen this request and it goes straight back to the team.
+              </p>
+              <button
+                onClick={reopenRequest}
+                className="mt-2 text-[13px] font-semibold text-[var(--ox)] border border-[var(--ox)] rounded-[3px] px-4 py-2 hover:bg-[var(--ox)] hover:text-[var(--paper)] transition-colors"
+              >
+                Reopen this request
+              </button>
+            </div>
+          )}
         </>
       )}
     </PortalShell>

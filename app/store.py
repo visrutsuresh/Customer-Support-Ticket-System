@@ -648,6 +648,27 @@ def file_as_history(ticket_id: str) -> str:
     return new_id
 
 
+def reopen_from_history(ticket_id: str) -> str | None:
+    # reverse of file_as_history: HIST-x becomes T-x again and rejoins the live queue.
+    # the rename also reconnects jira_links rows, which never left the T- id.
+    if not ticket_id.startswith("HIST-"):
+        return None
+    live_id = "T-" + ticket_id.split("-", 1)[-1]
+    with _connect() as conn:
+        if conn.execute("SELECT 1 FROM tickets WHERE ticket_id = %s", (live_id,)).fetchone():
+            return None  # a live twin exists (old zombie row): refuse rather than collide
+        cur = conn.execute(
+            "UPDATE tickets SET ticket_id = %s, lifecycle = 'open', human_status = 'pending' WHERE ticket_id = %s",
+            (live_id, ticket_id),
+        )
+        if cur.rowcount == 0:
+            return None
+        conn.execute("UPDATE attachments SET ticket_id = %s WHERE ticket_id = %s", (live_id, ticket_id))
+        conn.execute("UPDATE ticket_links SET a = %s WHERE a = %s", (live_id, ticket_id))
+        conn.execute("UPDATE ticket_links SET b = %s WHERE b = %s", (live_id, ticket_id))
+    return live_id
+
+
 def seed_history(customers) -> None:
     # resolved tickets per customer so past_tickets has data; deterministic ids, never touches real tickets.
     # every reporting field is filled so history reads like real, worked tickets.

@@ -67,8 +67,13 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-[100dvh] bg-[var(--paper)] grid grid-cols-[210px_1fr]">
       <aside className="sticky top-0 h-[100dvh] border-r border-[var(--line)] pl-[26px] py-6 flex flex-col">
-        <div className="w-10 h-10 bg-[var(--ox)] text-[var(--paper)] flex items-center justify-center text-xl rounded-[3px] mb-3">
-          雲
+        <div className="w-10 h-10 bg-[var(--ox)] text-[var(--paper)] flex items-center justify-center rounded-[3px] mb-3">
+          {/* original stylized cloud mark: lobed silhouette with an inward curl */}
+          <svg viewBox="0 0 24 18" width="26" height="20" fill="currentColor" aria-label="Nimbus cloud mark">
+            <path d="M6.2 14.8c-2.1 0-3.6-1.4-3.6-3.2 0-1.5 1-2.7 2.4-3.1-.1-2.2 1.6-4 3.8-4 1.4 0 2.6.7 3.3 1.8.6-1.6 2.1-2.7 3.9-2.7 2.3 0 4.2 1.8 4.2 4.1 0 .3 0 .6-.1.9 1.2.5 2 1.6 2 3 0 1.8-1.5 3.2-3.4 3.2z" />
+            <circle cx="12.6" cy="10.6" r="2.5" fill="var(--ox)" />
+            <path d="M12.6 8.1a2.5 2.5 0 0 1 2.5 2.5" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          </svg>
         </div>
         <div>
           <div className="text-[27px] font-extrabold leading-none" style={{ fontFamily: "var(--font-cabinet)" }}>

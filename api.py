@@ -28,8 +28,6 @@ from app.users import (
     require_staff,
 )
 
-store.init_db()  # make sure the tickets table exists when the API boots
-
 # AGENT_MODE toggle: deterministic (fixed LangGraph pipeline) | autonomous (5 ReAct agents + orchestrator)
 AGENT_MODE = os.getenv("AGENT_MODE", "deterministic").lower()
 active_graph = graph_auto if AGENT_MODE == "autonomous" else graph
@@ -46,11 +44,13 @@ app.add_middleware(
 
 app.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth", tags=["auth"])
 app.include_router(fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"])
+app.include_router(fastapi_users.get_verify_router(UserRead), prefix="/auth", tags=["auth"])
 app.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"])
 
 
 @app.on_event("startup")
 async def _startup():
+    store.init_db()  # tables exist when the API BOOTS, not when the module imports (tests need import without a DB)
     await create_user_table()
 
 
@@ -78,6 +78,7 @@ def health():
 
 @app.post("/tickets")
 def create_ticket(payload: TicketIn, background: BackgroundTasks, user: User = Depends(current_user)):
+    _require_verified(user)
     ticket_id = f"T-{uuid.uuid4().hex[:8]}"
     if user.role == "customer":
         payload.email = user.email  # identity comes from the account, never the form
@@ -229,8 +230,15 @@ def _reprocess(ticket_id: str, latest: str):
             _auto_dispatch(ticket_id)
 
 
+def _require_verified(user: User) -> None:
+    # an unverified customer account must not claim the tickets of an email it never proved owning
+    if user.role == "customer" and not user.is_verified:
+        raise HTTPException(status_code=403, detail="verify your email first")
+
+
 def _require_ticket_access(ticket_id: str, user: User) -> dict:
     # staff see everything; a customer only touches tickets born from their email
+    _require_verified(user)
     state = store.get(ticket_id)
     if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -249,6 +257,7 @@ def _require_open(state: dict) -> None:
 def my_tickets(user: User = Depends(current_user)):
     if user.role != "customer":
         raise HTTPException(status_code=403, detail="customer view")
+    _require_verified(user)
     return store.list_by_email(user.email)
 
 
@@ -261,6 +270,10 @@ def list_tickets(
     scope: str = "live",
     user: User = Depends(require_staff),
 ):
+    # least-privilege: the live queue is for all staff, raw archive browsing is admin-only.
+    # staff reach a customer's past tickets through the history panel on a live ticket instead.
+    if scope != "live" and user.role != "admin":
+        raise HTTPException(status_code=403, detail="archive browsing is admin only")
     return store.list_all(status=status, category=category, tag=tag, q=q, scope=scope)
 
 
@@ -270,6 +283,41 @@ def get_ticket(ticket_id: str, user: User = Depends(require_staff)):
     if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
     return state
+
+
+@app.get("/tickets/{ticket_id}/history")
+def customer_history(ticket_id: str, user: User = Depends(require_staff)):
+    # need-to-know archive access: having this customer's live ticket open unlocks
+    # their past tickets, without opening the whole archive to staff
+    state = store.get(ticket_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    email = state["ticket"].get("customer_email") or ""
+    if not email:
+        return []
+    return [r for r in store.list_by_email(email) if r["ticket_id"] != ticket_id]
+
+
+def _do_reopen(ticket_id: str) -> str:
+    live_id = store.reopen_from_history(ticket_id)
+    if live_id is None:
+        raise HTTPException(status_code=409, detail="not a reopenable archived ticket")
+    _CANCELLED.discard(live_id)  # the resolve marked it doomed; it lives again
+    return live_id
+
+
+@app.post("/tickets/{ticket_id}/reopen")
+def reopen_ticket(ticket_id: str, user: User = Depends(require_staff)):
+    return {"ticket_id": _do_reopen(ticket_id), "lifecycle": "open"}
+
+
+@app.post("/my/tickets/{ticket_id}/reopen")
+def customer_reopen(ticket_id: str, user: User = Depends(current_user)):
+    # a customer unsatisfied with the answer sends the ticket back to the live queue
+    if user.role != "customer":
+        raise HTTPException(status_code=403, detail="customer view")
+    _require_ticket_access(ticket_id, user)
+    return {"ticket_id": _do_reopen(ticket_id), "lifecycle": "open"}
 
 
 class EditIn(BaseModel):

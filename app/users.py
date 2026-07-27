@@ -46,6 +46,30 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = SECRET
     verification_token_secret = SECRET
 
+    async def on_after_register(self, user: User, request=None):
+        # open signup is customer-only; a fresh customer must prove the inbox is theirs
+        # before they can file or read tickets (the claim-any-email hole)
+        if user.role == "customer" and not user.is_verified:
+            try:
+                await self.request_verify(user, request)
+            except Exception as e:
+                print(f"[verify] could not start verification for {user.email}: {e}", flush=True)
+
+    async def on_after_request_verify(self, user: User, token: str, request=None):
+        from app.email_channel import send_email  # local import: email creds are optional at boot
+
+        base = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        body = (
+            "Welcome! Confirm this is your inbox by opening the link below.\n\n"
+            f"{base}/verify?token={token}\n\n"
+            "If you did not sign up, ignore this email."
+        )
+        try:
+            send_email(user.email, "Verify your email", body)
+        except Exception as e:
+            # mail being down must never break signup; the user can request a resend
+            print(f"[verify] could not send verification email to {user.email}: {e}", flush=True)
+
 
 async def get_user_manager(user_db=Depends(get_user_db)):
     yield UserManager(user_db)

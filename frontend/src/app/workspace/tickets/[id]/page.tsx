@@ -14,7 +14,10 @@ type State = {
   messages?: Msg[];
   tags?: string[];
   lifecycle?: string;
+  human_status?: string;
 };
+
+type HistoryRow = { ticket_id: string; subject: string; human_status: string; lifecycle: string; created_at: string | null };
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +26,8 @@ export default function TicketDetail() {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [newTag, setNewTag] = useState("");
+  const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [reopenArmed, setReopenArmed] = useState(false);
 
   const load = useCallback(() => {
     api(`/tickets/${id}`)
@@ -39,6 +44,22 @@ export default function TicketDetail() {
     const i = setInterval(load, 4000); // keep in sync with the other side's resolve
     return () => clearInterval(i);
   }, [load]);
+
+  useEffect(() => {
+    // need-to-know: this customer's past tickets, unlocked by having their ticket open
+    api(`/tickets/${id}/history`).then(setHistory).catch(() => setHistory([]));
+  }, [id]);
+
+  async function reopen() {
+    // double confirm: first press arms, second press fires
+    if (!reopenArmed) {
+      setReopenArmed(true);
+      setTimeout(() => setReopenArmed(false), 4000);
+      return;
+    }
+    const out = await api(`/tickets/${id}/reopen`, { method: "POST" });
+    router.replace(`/workspace/tickets/${out.ticket_id}`);
+  }
 
   async function addNote() {
     if (!note.trim()) return;
@@ -155,8 +176,28 @@ export default function TicketDetail() {
           {s.decision.reason && (
             <div className="font-array text-[10.5px] text-[var(--mut)] mb-3">GROUNDS: {s.decision.reason.toUpperCase()}</div>
           )}
+          {s.human_status === "processing" && (
+            <div className="mt-3">
+              <span className="workbar w-full" />
+              <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">
+                THE AGENTS ARE WORKING ON THIS TICKET
+              </p>
+            </div>
+          )}
           {locked ? (
-            <p className="font-array text-[11px] text-[var(--olive)] mt-3">RESOLVED · THIS TICKET IS LOCKED</p>
+            <div className="mt-3">
+              <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
+              <button
+                onClick={reopen}
+                className={`mt-3 font-semibold text-[13px] px-4 py-2 rounded-[3px] border transition-colors ${
+                  reopenArmed
+                    ? "bg-[var(--rust)] text-[var(--paper)] border-[var(--rust)]"
+                    : "text-[var(--mut)] border-[var(--line)] hover:border-[var(--rust)] hover:text-[var(--rust)]"
+                }`}
+              >
+                {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
+              </button>
+            </div>
           ) : (
             <Actions id={id} reply={s.draft.reply ?? ""} />
           )}
@@ -187,6 +228,32 @@ export default function TicketDetail() {
               )}
             </div>
           </div>
+          {history.length > 0 && (
+            <div className="border-t border-[var(--line)] mt-6 pt-4">
+              <span className="font-array text-[10.5px] text-[var(--mut)]">
+                THIS CUSTOMER&apos;S PAST TICKETS
+              </span>
+              <ul className="mt-2 space-y-1.5">
+                {history.slice(0, 6).map((h) => (
+                  <li key={h.ticket_id} className="text-[12.5px] flex items-baseline gap-2">
+                    <span className="font-array text-[10px] text-[var(--mut)] shrink-0">
+                      {h.lifecycle === "resolved" ? "RESOLVED" : "OPEN"}
+                    </span>
+                    {h.lifecycle === "resolved" ? (
+                      <span className="text-[var(--mut)]">{h.subject}</span>
+                    ) : (
+                      <Link
+                        href={`/workspace/tickets/${h.ticket_id}`}
+                        className="hover:text-[var(--ox)] underline underline-offset-2"
+                      >
+                        {h.subject}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </main>

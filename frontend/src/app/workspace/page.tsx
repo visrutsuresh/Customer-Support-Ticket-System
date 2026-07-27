@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useUser } from "@/lib/useUser";
 
 type Ticket = {
   ticket_id: string;
@@ -58,6 +59,7 @@ function statusView(s: string): { label: string; dot: string; pulse: boolean } {
 }
 
 export default function Queue() {
+  const { user } = useUser();
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -99,7 +101,8 @@ export default function Queue() {
       </div>
 
       <div className="flex gap-1 mt-4">
-        {["live", "archive", "all"].map((s) => (
+        {/* raw archive browsing is admin-only; staff reach history via the panel on a live ticket */}
+        {(user?.role === "admin" ? ["live", "archive", "all"] : ["live"]).map((s) => (
           <button
             key={s}
             onClick={() => setScope(s)}
@@ -195,7 +198,11 @@ export default function Queue() {
                     <i
                       className={`w-[7px] h-[7px] rounded-full ${st.dot} ${st.pulse ? "animate-pulse" : ""}`}
                     />
-                    {st.label}
+                    {st.label === "PROCESSING" ? (
+                      <span className="workbar w-[64px]" />
+                    ) : (
+                      st.label
+                    )}
                   </span>
                   <span
                     className={`font-array text-[10.5px] ${t.priority?.toLowerCase() === "high" ? "text-[var(--ox)] font-semibold" : t.priority?.toLowerCase() === "critical" ? "bg-[var(--ox)] text-[var(--paper)] px-2 py-0.5 rounded-[2px] justify-self-start" : "text-[var(--mut)]"}`}
