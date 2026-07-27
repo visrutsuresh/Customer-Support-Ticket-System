@@ -13,6 +13,24 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 # minutes from ticket arrival to the resolution deadline, by priority
 SLA_RESOLUTION_MINUTES = {"critical": 60, "high": 120, "medium": 180, "low": 240}
 
+# --- Performance Dashboard: cost + latency constants (added 2026-07-27) ---
+# Modal bills GPU WALL-CLOCK time, not tokens. This is the private-lane GPU rate.
+# Source: Modal pricing page (https://modal.com/pricing).
+# TODO(confirm): verify the exact current A10G / T4 $/second on the Modal pricing page.
+#   CLAUDE.md pins the privacy lane to gpu="T4"; the value below is the T4 rate.
+GPU_DOLLARS_PER_SECOND = 0.000164  # Tesla T4 on Modal, ~= $0.59/hr (TODO confirm current rate)
+# Heuristic only: a per-ticket wall-clock at/above this likely included a Modal cold-container spin-up.
+COLD_START_THRESHOLD_S = 30.0
+# Published Claude cloud-lane token prices (USD per token). Only MODEL_TIER='full' hits the cloud lane.
+# Verified against the Anthropic price table (per MTok): haiku 4.5 = $1/$5, sonnet 4.6 = $3/$15.
+# NOTE: per-ticket token counts are NOT captured yet, so these are defined but not yet applied.
+# TODO: add server-side generate_seconds + token counts to modal_lane/llm_service.py (personal laptop)
+#       for precise timing, and capture Anthropic usage in app/router.py for exact cloud cost.
+CLAUDE_HAIKU_INPUT_PER_TOKEN = 1.00 / 1_000_000
+CLAUDE_HAIKU_OUTPUT_PER_TOKEN = 5.00 / 1_000_000
+CLAUDE_SONNET_INPUT_PER_TOKEN = 3.00 / 1_000_000
+CLAUDE_SONNET_OUTPUT_PER_TOKEN = 15.00 / 1_000_000
+
 # templates: (name, category, keywords, auto_use, body). auto_use OFF by default = manual only (8b auto-send opt-in).
 DEFAULT_TEMPLATES = [
     (
@@ -79,6 +97,8 @@ def init_db():
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS csat INT")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS merged_into TEXT")
         conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS customer_email TEXT")
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS processing_seconds DOUBLE PRECISION")
+        conn.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS ticket_links(
@@ -310,18 +330,37 @@ def replace_last_agent_message(ticket_id: str, body: str) -> bool:
 
 
 def metrics() -> dict:
+    # Cross-cutting: computed at the SHARED layer from stored ticket state, so BOTH pipelines
+    # (deterministic graph.py + autonomous orchestrator.py) feed the same dashboard. Both write
+    # decision.action ('escalate'/'auto_send') to the `action` column and compliance.verdict into
+    # the jsonb `state`. Recomputed on every call, so latency/cost stay truthful as volume grows.
     with _connect() as conn:
         cur = conn.cursor(row_factory=dict_row)
-        cur.execute("""
+        cur.execute(
+            """
         SELECT
-         COUNT(*)    AS total,
+         COUNT(*) AS total,
          COUNT(*) FILTER (WHERE action = 'escalate') AS escalated,
          COUNT(*) FILTER (WHERE action = 'auto_send') AS auto_resolved,
-         AVG(csat)::float AS avg_csat,
-         COUNT(csat) AS csat_count
+         AVG(csat) AS avg_csat,
+         COUNT(csat) AS csat_count,
+         COUNT(*) FILTER (WHERE lifecycle = 'resolved') AS resolved_count,
+         COUNT(*) FILTER (WHERE state -> 'compliance' ->> 'verdict' IS NOT NULL) AS compliance_reviewed,
+         COUNT(*) FILTER (WHERE lower(state -> 'compliance' ->> 'verdict') = 'pass') AS compliance_passed,
+         COUNT(processing_seconds) AS timing_count,
+         AVG(processing_seconds) AS avg_processing_seconds,
+         COALESCE(SUM(processing_seconds), 0) AS total_processing_seconds,
+         COUNT(*) FILTER (WHERE processing_seconds >= %(cold)s) AS cold_count,
+         AVG(processing_seconds) FILTER (WHERE processing_seconds >= %(cold)s) AS cold_avg_seconds,
+         COUNT(*) FILTER (WHERE processing_seconds < %(cold)s) AS warm_count,
+         AVG(processing_seconds) FILTER (WHERE processing_seconds < %(cold)s) AS warm_avg_seconds,
+         COUNT(*) FILTER (WHERE resolved_at IS NOT NULL AND created_at IS NOT NULL) AS resolution_time_count,
+         AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) FILTER (WHERE resolved_at IS NOT NULL AND created_at IS NOT NULL) AS avg_resolution_seconds
         FROM tickets
-        """)
-        result = cur.fetchone()
+        """,
+            {"cold": COLD_START_THRESHOLD_S},
+        )
+        r = cur.fetchone()
 
         cur.execute("""
         SELECT category, COUNT(*) AS n
@@ -332,7 +371,76 @@ def metrics() -> dict:
         """)
         by_category = cur.fetchall()
 
-        return {**result, "by_category": by_category}
+    def _f(v):
+        return float(v) if v is not None else None
+
+    total = r["total"] or 0
+    escalated = r["escalated"] or 0
+    auto_resolved = r["auto_resolved"] or 0
+    decided = escalated + auto_resolved  # tickets that actually reached a decision
+    timing_count = r["timing_count"] or 0
+    reviewed = r["compliance_reviewed"] or 0
+    passed = r["compliance_passed"] or 0
+    total_gpu_seconds = _f(r["total_processing_seconds"]) or 0.0
+    gpu_cost_total = total_gpu_seconds * GPU_DOLLARS_PER_SECOND
+
+    return {
+        # --- existing keys kept for backward compatibility ---
+        "total": total,
+        "escalated": escalated,
+        "auto_resolved": auto_resolved,
+        "avg_csat": _f(r["avg_csat"]),
+        "csat_count": r["csat_count"] or 0,
+        "by_category": by_category,
+        # --- REAL: rates from stored decisions ---
+        "decided": decided,
+        "escalation_rate": (escalated / decided) if decided else None,
+        "first_contact_resolution_rate": (auto_resolved / decided) if decided else None,
+        "resolved_count": r["resolved_count"] or 0,
+        # --- REAL: compliance PASS RATE (the review agent's stored verdict) ---
+        "compliance": {
+            "reviewed": reviewed,
+            "passed": passed,
+            "pass_rate": (passed / reviewed) if reviewed else None,
+            "note": "share of reviewed replies the compliance agent passed (pass RATE, not ground-truth accuracy)",
+        },
+        # --- REAL: latency, cumulative running average recomputed every call ---
+        "latency": {
+            "sample_size": timing_count,
+            "avg_seconds": _f(r["avg_processing_seconds"]),
+            "cold": {"count": r["cold_count"] or 0, "avg_seconds": _f(r["cold_avg_seconds"])},
+            "warm": {"count": r["warm_count"] or 0, "avg_seconds": _f(r["warm_avg_seconds"])},
+            "cold_threshold_seconds": COLD_START_THRESHOLD_S,
+            "note": "app-side wall-clock per ticket (pipeline invoke). cold/warm is a heuristic split on the threshold, not a Modal-reported cold start.",
+        },
+        # --- REAL (forward-looking): resolution time from timestamps ---
+        "resolution_time": {
+            "sample_size": r["resolution_time_count"] or 0,
+            "avg_seconds": _f(r["avg_resolution_seconds"]),
+            "note": "created_at -> resolved_at, real; only covers tickets resolved after resolved_at capture shipped (older/seeded tickets have no resolved_at)",
+        },
+        # --- COST: labelled running ESTIMATE ---
+        "cost": {
+            "estimate": True,
+            "gpu_seconds_measured": total_gpu_seconds,
+            "gpu_dollars_per_second": GPU_DOLLARS_PER_SECOND,
+            "gpu_cost_total": gpu_cost_total,
+            "priced_tickets": timing_count,
+            "cost_per_ticket": (gpu_cost_total / timing_count) if timing_count else None,
+            "cloud_token_cost": {
+                "available": False,
+                "note": "Claude 'full'-tier per-ticket token counts are not captured yet; exact cloud cost pending. Price constants defined in store.py.",
+            },
+            "note": "ESTIMATE. Modal bills GPU wall-clock; app-side wall-clock is used as a proxy for GPU-active seconds (overstates slightly). TODO: reconcile the computed total against the Modal dashboard.",
+        },
+        # --- SAMPLE: no real source ---
+        "csat_improvement": {
+            "value": 12.0,
+            "unit": "percent",
+            "sample": True,
+            "note": "SAMPLE placeholder, not measured. No baseline-CSAT source exists to compute a real improvement.",
+        },
+    }
 
 
 def append_message(ticket_id: str, role: str, body: str) -> bool:
@@ -347,8 +455,24 @@ def append_message(ticket_id: str, role: str, body: str) -> bool:
 
 
 def set_lifecycle(ticket_id: str, lifecycle: str) -> bool:
+    # stamp resolved_at the first time a ticket becomes resolved (real resolution-time source)
     with _connect() as conn:
-        cur = conn.execute("UPDATE tickets SET lifecycle = %s WHERE ticket_id = %s", (lifecycle, ticket_id))
+        cur = conn.execute(
+            """UPDATE tickets
+               SET lifecycle = %s,
+                   resolved_at = CASE WHEN %s = 'resolved' AND resolved_at IS NULL THEN now() ELSE resolved_at END
+               WHERE ticket_id = %s""",
+            (lifecycle, lifecycle, ticket_id),
+        )
+        return cur.rowcount > 0
+
+def set_processing_seconds(ticket_id: str, seconds: float) -> bool:
+    # wall-clock of the shared api.py pipeline run for this ticket (latest run wins)
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE tickets SET processing_seconds = %s WHERE ticket_id = %s",
+            (seconds, ticket_id),
+        )
         return cur.rowcount > 0
 
 

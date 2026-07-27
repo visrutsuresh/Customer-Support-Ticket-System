@@ -79,7 +79,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
         <nav className="mt-10 flex flex-col gap-1">
           {navItem("/workspace", "Queue", pathname === "/workspace")}
-          {navItem("/workspace/metrics", "Metrics", pathname === "/workspace/metrics")}
+          {navItem("/workspace/metrics", "Performance", pathname === "/workspace/metrics")}
           <button
             onClick={syncEmail}
             className="text-left py-2 pr-4 text-[13.5px] font-medium text-[var(--mut)] hover:text-[var(--ink)] transition-colors"

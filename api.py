@@ -1,6 +1,7 @@
 import os
 import re
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -171,6 +172,7 @@ def _auto_dispatch(ticket_id: str) -> None:
 
 
 def _process(ticket_id: str, raw: dict):
+    _t0 = time.monotonic()  # shared-layer per-ticket latency capture (feeds the Performance Dashboard)
     final = _invoke_guarded(
         ticket_id,
         {
@@ -183,6 +185,7 @@ def _process(ticket_id: str, raw: dict):
         return
     if final and final.get("ticket") is not None:
         store.save(final)
+        store.set_processing_seconds(ticket_id, time.monotonic() - _t0)  # wall-clock of this run
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
         if (final.get("decision") or {}).get("action") == "escalate":
@@ -211,11 +214,13 @@ def _reprocess(ticket_id: str, latest: str):
         "name": t.get("customer_name"),
         "email": t.get("customer_email"),
     }
+    _t0 = time.monotonic()  # shared-layer per-ticket latency capture (feeds the Performance Dashboard)
     final = _invoke_guarded(ticket_id, {"raw_input": raw, "messages": prior.get("messages", []), "audit": []})
     if ticket_id in _CANCELLED:
         return
     if final and final.get("ticket") is not None:
         store.save(final)
+        store.set_processing_seconds(ticket_id, time.monotonic() - _t0)  # wall-clock of this run
         for tag in auto_tags(final.get("classification", {})):
             store.add_tag(ticket_id, tag)
         if (final.get("decision") or {}).get("action") == "escalate":
