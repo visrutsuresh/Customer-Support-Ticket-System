@@ -51,11 +51,14 @@ def classify(state: State) -> dict:
       complaint = venting dissatisfaction with no specific fixable request
       general = anything that fits none of the above
 
-    priority: one of [Critical,High,Medium,Low]
-      Critical = service down, a security or data breach, a legal threat, or a vulnerable customer at risk
-      High = money is at stake, the customer is angry, or there is a hard deadline
-      Medium = a normal problem that needs help but is not urgent
-      Low = a simple how-to, self-serve, or informational question
+    priority: one of [Critical,High,Medium,Low]. Take the HIGHEST line that is clearly true; if two fit equally, take the lower one.
+      Critical = the service is unusable right now for a whole team, site or many users; OR the account or its data may be compromised; OR the customer names lawyers, a regulator, or legal action; OR someone's safety or wellbeing is at risk.
+        An outage affecting a whole office is ALWAYS Critical, even politely worded. A legal threat is ALWAYS Critical, even over a small sum.
+        One person saying "nothing works" with no detail is NOT Critical: one customer stuck is not many users. Judge Critical on how many are affected, not on how upset the words sound.
+      High = one customer is blocked or waiting on something time-bound: a payment failed and access is about to lapse, a refund is PAST the time we quoted, a delivery is confirmed missing or damaged, they state a deadline, a data-rights request (access or erasure) that has a legal clock, or they are angry AND still waiting for something we owe them.
+        Asking how long something normally takes is not High. Waiting inside the time we quoted is not High.
+      Medium = a real problem with no deadline and nothing already lost: something works badly, a query about a charge that has not harmed them yet, an ordinary request for help, or dissatisfaction where they are not waiting on us for anything.
+      Low = a how-to, a policy or pricing question, a preference, or a suggestion. Nothing is broken and nobody is waiting.
 
     business_impact: one of [low,medium,high]
       high = risks losing the customer, a large sum of money, many users affected, or legal/reputational exposure

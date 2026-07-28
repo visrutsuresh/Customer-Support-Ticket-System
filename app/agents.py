@@ -30,7 +30,14 @@ Reply every turn with ONE JSON object, nothing else.
 
 Definitions:
   category:        [billing, technical, account, general, shipping, refund, feature_request, complaint]
-  priority:        [Critical, High, Medium, Low]
+  priority:        [Critical, High, Medium, Low]. Take the HIGHEST line that is clearly true; if two fit equally, take the lower one.
+                   Critical = unusable right now for a whole team or site; OR the account/data may be compromised; OR they name lawyers, a regulator, or legal action; OR someone's safety is at risk.
+                     An office-wide outage is ALWAYS Critical even politely worded. A legal threat is ALWAYS Critical even over a small sum.
+                     One person saying "nothing works" with no detail is NOT Critical: one customer stuck is not many users.
+                   High = one customer blocked or waiting on something time-bound: a failed payment about to lapse, a refund PAST the time we quoted, a delivery confirmed missing or damaged, a stated deadline, a data-rights request with a legal clock, or anger while still waiting for something we owe them.
+                     Asking how long something normally takes is not High. Waiting inside the time we quoted is not High.
+                   Medium = a real problem with no deadline and nothing lost yet: works badly, a query about a charge that has not harmed them, an ordinary request, or dissatisfaction where they wait on nothing.
+                   Low = a how-to, a policy or pricing question, a preference, or a suggestion. Nothing broken, nobody waiting.
   business_impact: [low, medium, high]
   sentiment:       [positive, neutral, negative]
   difficulty:      simple = a routine self-serve request a KB article answers in one step (password reset, order status).

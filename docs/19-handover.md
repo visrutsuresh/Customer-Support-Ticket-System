@@ -35,7 +35,7 @@ Expect this order: start the containers, run the four seed scripts, start the AP
 
 ## 5. Open work, in the order worth doing
 
-1. **Priority classification**, correct on two thirds of the labelled set, with two critical tickets scored merely high. Tightening the priority definitions in the classify prompt and re-running `eval.py --classify` is the cheapest measurable win available. (The labelled set itself now exists: `data/eval_set.jsonl` plus `eval.py`.)
+1. **Retrieval at rank one**, 36 percent against 100 percent at rank five. The right article is nearly always in the list but rarely first, and the drafting prompt reads the top hits, so this is the next measurable quality win. Re-running the retrieval half of `eval.py` is free, which makes it cheap to iterate on. (Priority classification was the previous entry here and has been done: 66.7 to 73.3 percent, all three critical tickets fixed, by rewriting the priority definitions in both pipelines.)
 2. **The two missing safety tests:** one proving the audit chain detects tampering, one asserting a sensitive ticket never reaches the cloud lane.
 3. **Escalate rather than error when the private lane is down.** Today a lane outage ends in an error status, which meets the privacy rule but not the intent.
 4. **An endpoint that accepts a transcript**, so the third intake format is reachable.

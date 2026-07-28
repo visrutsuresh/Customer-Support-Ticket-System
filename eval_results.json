@@ -11,23 +11,19 @@
    "no_coverage_tickets": 8,
    "no_coverage_returned_something": 8
   },
-  "elapsed_s": 249.4,
+  "elapsed_s": 175.4,
   "classification": {
    "scored": 30,
-   "category_accuracy_pct": 83.3,
-   "priority_accuracy_pct": 66.7,
-   "both_correct_pct": 60.0,
+   "category_accuracy_pct": 86.7,
+   "priority_accuracy_pct": 73.3,
+   "both_correct_pct": 66.7,
    "category_confusions": [
     [
-     "technical -> account",
+     "billing -> general",
      1
     ],
     [
      "account -> technical",
-     1
-    ],
-    [
-     "general -> shipping",
      1
     ],
     [
@@ -89,9 +85,9 @@
     "covered": true
    },
    "classification": {
-    "got_category": "account",
+    "got_category": "technical",
     "got_priority": "high",
-    "category_ok": false,
+    "category_ok": true,
     "priority_ok": false
    }
   },
@@ -142,9 +138,9 @@
    },
    "classification": {
     "got_category": "refund",
-    "got_priority": "medium",
+    "got_priority": "low",
     "category_ok": true,
-    "priority_ok": true
+    "priority_ok": false
    }
   },
   {
@@ -168,9 +164,9 @@
    },
    "classification": {
     "got_category": "shipping",
-    "got_priority": "medium",
+    "got_priority": "high",
     "category_ok": true,
-    "priority_ok": true
+    "priority_ok": false
    }
   },
   {
@@ -272,9 +268,9 @@
     "covered": true
    },
    "classification": {
-    "got_category": "billing",
+    "got_category": "general",
     "got_priority": "low",
-    "category_ok": true,
+    "category_ok": false,
     "priority_ok": true
    }
   },
@@ -352,9 +348,9 @@
    },
    "classification": {
     "got_category": "account",
-    "got_priority": "medium",
+    "got_priority": "low",
     "category_ok": true,
-    "priority_ok": false
+    "priority_ok": true
    }
   },
   {
@@ -405,9 +401,9 @@
    },
    "classification": {
     "got_category": "account",
-    "got_priority": "high",
+    "got_priority": "critical",
     "category_ok": true,
-    "priority_ok": false
+    "priority_ok": true
    }
   },
   {
@@ -457,9 +453,9 @@
    },
    "classification": {
     "got_category": "technical",
-    "got_priority": "medium",
+    "got_priority": "high",
     "category_ok": true,
-    "priority_ok": true
+    "priority_ok": false
    }
   },
   {
@@ -535,9 +531,9 @@
     "covered": true
    },
    "classification": {
-    "got_category": "shipping",
+    "got_category": "general",
     "got_priority": "low",
-    "category_ok": false,
+    "category_ok": true,
     "priority_ok": true
    }
   },
@@ -636,7 +632,7 @@
    },
    "classification": {
     "got_category": "complaint",
-    "got_priority": "high",
+    "got_priority": "low",
     "category_ok": true,
     "priority_ok": false
    }
@@ -660,9 +656,9 @@
    },
    "classification": {
     "got_category": "feature_request",
-    "got_priority": "medium",
+    "got_priority": "low",
     "category_ok": true,
-    "priority_ok": false
+    "priority_ok": true
    }
   },
   {
@@ -732,9 +728,9 @@
    },
    "classification": {
     "got_category": "billing",
-    "got_priority": "high",
+    "got_priority": "critical",
     "category_ok": true,
-    "priority_ok": false
+    "priority_ok": true
    }
   },
   {
@@ -756,9 +752,9 @@
    },
    "classification": {
     "got_category": "account",
-    "got_priority": "medium",
+    "got_priority": "high",
     "category_ok": true,
-    "priority_ok": false
+    "priority_ok": true
    }
   },
   {

@@ -55,7 +55,7 @@ Legend: **MET** implemented; **PARTIAL** intent covered but a stated piece is mi
 
 | Metric | Verdict | Evidence |
 |---|---|---|
-| Classification accuracy | MET | `data/eval_set.jsonl` (30 labelled tickets) scored by `eval.py`: category 83.3%, priority 66.7%, both 60% |
+| Classification accuracy | MET | `data/eval_set.jsonl` (30 labelled tickets) scored by `eval.py`: category 86.7%, priority 73.3%, both 66.7%, all 3 critical tickets correct |
 | Retrieval hit rate | MET | Same set: 100% at top five over 22 answerable tickets, 36% at rank one, mean rank 1.86. Free to re-run |
 | Auto-resolved against escalated | MET | `store.metrics()`, `bench.py`, dashboard |
 | Compliance pass rate | MET | `store.metrics()`, dashboard |

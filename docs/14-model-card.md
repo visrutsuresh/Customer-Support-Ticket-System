@@ -50,7 +50,9 @@ Every one of these is parsed by code that expects a specific shape, and every pa
 
 ## 5. What is not measured
 
-**Measured as of 2026-07-28**, against 30 labelled tickets: category 83.3 percent, priority 66.7 percent, both correct on the same ticket 60 percent, retrieval hit rate 100 percent at top five and 36 percent at rank one. Priority errors lean safe, seven over-rating against three under-rating, but two critical tickets, an outage and a legal threat, were scored high rather than critical.
+**Measured as of 2026-07-28**, against 30 labelled tickets: category 86.7 percent, priority 73.3 percent, both correct on the same ticket 66.7 percent, retrieval hit rate 100 percent at top five and 36 percent at rank one. All three critical tickets are rated critical; the remaining priority errors lean upward, six over-rating against two under-rating, which costs a needless human review rather than a missed emergency.
+
+The first measured run scored only one of the three criticals correctly, which is what prompted rewriting the priority definitions in both pipelines. That change is the clearest evidence in the project that the labelled set earns its keep: the defect was invisible until something scored it.
 
 Still unmeasured: whether an auto-sent reply was actually **useful** to the customer, and whether an escalation was necessary. Both need either a human rater or real customer feedback, and neither exists on synthetic data. The customer rating field is the closest available proxy and is only populated in demonstrations.
 

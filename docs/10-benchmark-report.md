@@ -37,22 +37,26 @@ uv run python eval.py             # retrieval only, free, no model calls
 uv run python eval.py --classify  # adds one model call per ticket
 ```
 
-**Results, 30 tickets, 0 errors, 249 seconds:**
+**Results, 30 tickets, 0 errors:**
 
-| Measure | Result |
-|---|---|
-| Retrieval hit rate, top 5 | **100%** (22 of 22 answerable tickets) |
-| Retrieval hit at rank 1 | 36% (8 of 22), mean rank of a hit 1.86 |
-| Classification accuracy, category | **83.3%** |
-| Classification accuracy, priority | **66.7%** |
-| Both correct on the same ticket | 60.0% |
+| Measure | First run | After the priority-prompt fix |
+|---|---|---|
+| Retrieval hit rate, top 5 | 100% (22 of 22 answerable) | **100%** |
+| Retrieval hit at rank 1 | 36% (8 of 22), mean rank 1.86 | 36% |
+| Classification accuracy, category | 83.3% | **86.7%** |
+| Classification accuracy, priority | 66.7% | **73.3%** |
+| Both correct on the same ticket | 60.0% | **66.7%** |
+| Critical tickets rated critical | 1 of 3 | **3 of 3** |
+
+**What the fix was.** The first run showed the real defect: an office-wide outage and a legal threat both came back as merely high. The priority definitions were doing too little work, so they were rewritten in both pipelines to say what critical actually means (many users affected, the account compromised, lawyers or regulators named, safety at risk), to say that one stuck customer is not many users, and to stop "money is at stake" pulling every ordinary billing question up to high. Two rounds of that, measured each time, moved priority from 66.7 to 73.3 percent and fixed all three critical tickets. Nothing but prompt text changed.
 
 **Reading these honestly:**
 
 - **Hit rate at five is a soft measure.** With five slots and a relevance floor, the right article is almost always somewhere in the list. Rank one at 36 percent is the number that discriminates, and it is the one to improve.
 - **Retrieval cannot tell "no good article" from "good article".** All eight no-coverage tickets still returned hits, scoring 77 to 89, inside the same band as genuine matches. The score floor cannot separate them. What actually protects those tickets is the control line in the drafting prompt, which lets the agent say it must ask or escalate. That is prompt-level, not structural.
-- **Category confusion is sensible, not random.** Five errors, each a single ticket: technical against account in both directions, a delivery question read as shipping rather than general, a complaint read as a refund, and a feature request read as billing.
-- **Priority is the weak dimension, and it errs safe.** Ten misses: seven over-rate (medium to high, low to medium), three under-rate. The two that matter are the two critical tickets scored high, an outage and a legal threat, because under-rating is the direction that hurts.
+- **Category confusion is sensible, not random.** Four errors, each a single ticket: an account problem read as technical, a billing question read as general, a complaint read as a refund, and a feature request read as billing.
+- **Priority still errs upward.** Eight misses: six over-rate (five medium to high, one low to medium) and two under-rate (medium read as low). Over-rating costs a needless human review; under-rating is the direction that hurts, and the worst cases, the criticals, are now correct.
+- **Small deltas here are noise.** Thirty tickets against a model at temperature zero is still one sample, and one run lost a ticket to a lane timeout. Treat a two-point move as nothing; the critical-ticket count moving from 1 of 3 to 3 of 3 is the real result.
 
 ## 5. Limits, stated plainly
 
