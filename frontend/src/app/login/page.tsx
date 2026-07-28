@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { login, register } from "@/lib/useUser";
+import { login, register, resendVerification, NotVerifiedError } from "@/lib/useUser";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [inboxWait, setInboxWait] = useState(false);
+  const [resent, setResent] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,6 +28,10 @@ export default function LoginPage() {
       const me = await api("/users/me");
       router.push(me.role === "customer" ? "/" : "/workspace");
     } catch (err) {
+      if (err instanceof NotVerifiedError) {
+        setInboxWait(true); // same screen as signup: the account exists, the inbox is unproved
+        return;
+      }
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
@@ -40,15 +45,24 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold">Check your inbox</h1>
           <p className="text-sm text-[var(--mut)] mt-3 leading-relaxed">
             We sent a verification link to <b className="text-[var(--ink)]">{email}</b>. Open it to
-            prove the inbox is yours, then sign in. Until then you can look around but not file
-            requests.
+            prove the inbox is yours. You cannot sign in until you do.
           </p>
+          <button
+            onClick={async () => {
+              await resendVerification(email);
+              setResent(true);
+            }}
+            className="mt-6 block text-sm text-[var(--ox)] underline underline-offset-4"
+          >
+            {resent ? "Link sent again" : "Resend the link"}
+          </button>
           <button
             onClick={() => {
               setInboxWait(false);
+              setResent(false);
               setMode("signin");
             }}
-            className="mt-6 text-sm text-[var(--ox)] underline underline-offset-4"
+            className="mt-3 text-sm text-[var(--mut)] underline underline-offset-4"
           >
             Back to sign in
           </button>

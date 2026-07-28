@@ -29,7 +29,10 @@ async def main():
                 await db.update(user, {"role": role, "is_verified": True})
                 print(f"created {email} as {role}")
             except UserAlreadyExists:
-                print(f"exists  {email}")
+                # the flag matters now, so repair accounts seeded before verification existed
+                existing = await db.get_by_email(email)
+                await db.update(existing, {"role": role, "is_verified": True})
+                print(f"repaired {email} as {role}")
 
 
 asyncio.run(main())

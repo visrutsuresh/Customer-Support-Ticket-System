@@ -58,7 +58,8 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     async def on_after_request_verify(self, user: User, token: str, request=None):
         from app.email_channel import send_email  # local import: email creds are optional at boot
 
-        base = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        # a blank value in the file must fall back too, not just a missing key
+        base = os.getenv("FRONTEND_URL") or "http://localhost:3000"
         body = (
             "Welcome! Confirm this is your inbox by opening the link below.\n\n"
             f"{base}/verify?token={token}\n\n"
@@ -85,7 +86,7 @@ def get_jwt_strategy() -> JWTStrategy:
 auth_backend = AuthenticationBackend(name="cookie", transport=cookie_transport, get_strategy=get_jwt_strategy)
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
-current_user = fastapi_users.current_user(active=True)
+current_user = fastapi_users.current_user(active=True, verified=True)
 
 
 def require_staff(user: User = Depends(current_user)) -> User:
