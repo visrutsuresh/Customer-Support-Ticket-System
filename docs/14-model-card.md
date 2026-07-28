@@ -50,7 +50,9 @@ Every one of these is parsed by code that expects a specific shape, and every pa
 
 ## 5. What is not measured
 
-There is no labelled evaluation set, so **classification accuracy and retrieval hit rate are unknown**. Everything reported in [10-benchmark-report.md](10-benchmark-report.md) is a rate or a latency, not a correctness score. Any claim that the system classifies well is, at this stage, an impression rather than a measurement, and should be described that way.
+**Measured as of 2026-07-28**, against 30 labelled tickets: category 83.3 percent, priority 66.7 percent, both correct on the same ticket 60 percent, retrieval hit rate 100 percent at top five and 36 percent at rank one. Priority errors lean safe, seven over-rating against three under-rating, but two critical tickets, an outage and a legal threat, were scored high rather than critical.
+
+Still unmeasured: whether an auto-sent reply was actually **useful** to the customer, and whether an escalation was necessary. Both need either a human rater or real customer feedback, and neither exists on synthetic data. The customer rating field is the closest available proxy and is only populated in demonstrations.
 
 ## 6. Appropriate and inappropriate use
 

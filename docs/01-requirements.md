@@ -46,4 +46,6 @@ No speech to text (transcripts arrive as text). No live external ticketing integ
 
 ## 6. Known requirement gaps
 
-Two measurement requirements are unmet and are the loudest remaining gap: **classification accuracy** and **retrieval hit rate** both need a labelled evaluation set, which does not exist. Every claim about quality in this documentation set is therefore either a rate (escalation, compliance pass) or a latency, never an accuracy.
+**Closed 2026-07-28:** the two measurement requirements, classification accuracy and retrieval hit rate, were previously unmeasurable because no labelled evaluation set existed. `data/eval_set.jsonl` (30 labelled tickets) and `eval.py` now report them: category 83.3 percent, priority 66.7 percent, retrieval hit rate 100 percent at five and 36 percent at rank one. See [10-benchmark-report.md](10-benchmark-report.md) section 4.
+
+Remaining gaps: **cost per ticket** covers GPU time but not cloud tokens; **FR-1's transcript format** has a parser but no endpoint that reaches it; and **FR-8's escalation rule** treats high priority and sensitivity as a higher confidence bar rather than a forced escalation.

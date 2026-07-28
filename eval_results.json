@@ -1,0 +1,815 @@
+{
+ "summary": {
+  "tickets": 30,
+  "errors": 0,
+  "retrieval": {
+   "answerable_tickets": 22,
+   "hits": 22,
+   "hit_rate_pct": 100.0,
+   "mean_rank_of_hit": 1.86,
+   "top1_hits": 8,
+   "no_coverage_tickets": 8,
+   "no_coverage_returned_something": 8
+  },
+  "elapsed_s": 249.4,
+  "classification": {
+   "scored": 30,
+   "category_accuracy_pct": 83.3,
+   "priority_accuracy_pct": 66.7,
+   "both_correct_pct": 60.0,
+   "category_confusions": [
+    [
+     "technical -> account",
+     1
+    ],
+    [
+     "account -> technical",
+     1
+    ],
+    [
+     "general -> shipping",
+     1
+    ],
+    [
+     "complaint -> refund",
+     1
+    ],
+    [
+     "feature_request -> billing",
+     1
+    ]
+   ]
+  }
+ },
+ "rows": [
+  {
+   "id": "e01",
+   "expect": {
+    "category": "technical",
+    "priority": "high",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": [
+     "Reset your password",
+     "Account security and sign-in"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Reset your password",
+    "top_score": 87.9,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "technical",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e02",
+   "expect": {
+    "category": "technical",
+    "priority": "medium",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": [
+     "Reset your password"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Reset your password",
+    "top_score": 87.3,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "account",
+    "got_priority": "high",
+    "category_ok": false,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e03",
+   "expect": {
+    "category": "refund",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Refund policy"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Refund for a cancelled order",
+    "top_score": 89.5,
+    "hit": true,
+    "rank": 3,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "refund",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e04",
+   "expect": {
+    "category": "refund",
+    "priority": "medium",
+    "difficulty": "simple",
+    "sensitive": true,
+    "kb_titles": [
+     "Refund policy"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Refund for a cancelled order",
+    "top_score": 89.5,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "refund",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e05",
+   "expect": {
+    "category": "shipping",
+    "priority": "medium",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": [
+     "Track your order"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Tracking had not updated",
+    "top_score": 89.1,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "shipping",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e06",
+   "expect": {
+    "category": "shipping",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": [
+     "Track your order",
+     "Damaged or missing items"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Tracking had not updated",
+    "top_score": 87.7,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "shipping",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e07",
+   "expect": {
+    "category": "shipping",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": [
+     "Damaged or missing items"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Package arrived damaged",
+    "top_score": 85.4,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "shipping",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e08",
+   "expect": {
+    "category": "billing",
+    "priority": "medium",
+    "difficulty": "simple",
+    "sensitive": true,
+    "kb_titles": [
+     "Plans and billing"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "How do I change my plan",
+    "top_score": 90.4,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "billing",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e09",
+   "expect": {
+    "category": "billing",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": true,
+    "kb_titles": [
+     "Plans and billing"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Plans and billing",
+    "top_score": 87.7,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "billing",
+    "got_priority": "low",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e10",
+   "expect": {
+    "category": "billing",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Payment methods and failed payments"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Unexpected charge on my card",
+    "top_score": 86.8,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "billing",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e11",
+   "expect": {
+    "category": "billing",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Payment methods and failed payments",
+     "Plans and billing"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Unexpected charge on my card",
+    "top_score": 87.8,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "billing",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e12",
+   "expect": {
+    "category": "account",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": true,
+    "kb_titles": [
+     "Update your account email"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Update your account email",
+    "top_score": 89.4,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "account",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e13",
+   "expect": {
+    "category": "account",
+    "priority": "medium",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Update your account email",
+     "Account security and sign-in"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Locked out of my account",
+    "top_score": 85.1,
+    "hit": true,
+    "rank": 3,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "technical",
+    "got_priority": "high",
+    "category_ok": false,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e14",
+   "expect": {
+    "category": "account",
+    "priority": "critical",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Account security and sign-in"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Locked out of my account",
+    "top_score": 85.9,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "account",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e15",
+   "expect": {
+    "category": "technical",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": [
+     "App keeps crashing or freezing"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "App would not open after an update",
+    "top_score": 89.4,
+    "hit": true,
+    "rank": 3,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "technical",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e16",
+   "expect": {
+    "category": "technical",
+    "priority": "medium",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": [
+     "App keeps crashing or freezing"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "App keeps crashing or freezing",
+    "top_score": 85.6,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "technical",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e17",
+   "expect": {
+    "category": "refund",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Cancel your subscription",
+     "Refund policy"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Cancel your subscription",
+    "top_score": 87.1,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "refund",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e18",
+   "expect": {
+    "category": "account",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": true,
+    "kb_titles": [
+     "Cancel your subscription"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Cancel your subscription",
+    "top_score": 87.0,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "account",
+    "got_priority": "low",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e19",
+   "expect": {
+    "category": "general",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": [
+     "Delivery times"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Track your order",
+    "top_score": 87.1,
+    "hit": true,
+    "rank": 2,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "shipping",
+    "got_priority": "low",
+    "category_ok": false,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e20",
+   "expect": {
+    "category": "shipping",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": [
+     "Delivery times"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Track your order",
+    "top_score": 80.6,
+    "hit": true,
+    "rank": 3,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "shipping",
+    "got_priority": "low",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e21",
+   "expect": {
+    "category": "general",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": [
+     "Contact support"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Contact support",
+    "top_score": 81.6,
+    "hit": true,
+    "rank": 1,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "general",
+    "got_priority": "low",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e22",
+   "expect": {
+    "category": "complaint",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Refund for a cancelled order",
+    "top_score": 88.9,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "refund",
+    "got_priority": "high",
+    "category_ok": false,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e23",
+   "expect": {
+    "category": "complaint",
+    "priority": "medium",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Refund request",
+    "top_score": 83.3,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "complaint",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e24",
+   "expect": {
+    "category": "feature_request",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "App crash",
+    "top_score": 80.2,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "feature_request",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e25",
+   "expect": {
+    "category": "feature_request",
+    "priority": "low",
+    "difficulty": "simple",
+    "sensitive": false,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "How do I change my plan",
+    "top_score": 79.7,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "billing",
+    "got_priority": "medium",
+    "category_ok": false,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e26",
+   "expect": {
+    "category": "technical",
+    "priority": "critical",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Locked out of my account",
+    "top_score": 77.7,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "technical",
+    "got_priority": "critical",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  },
+  {
+   "id": "e27",
+   "expect": {
+    "category": "billing",
+    "priority": "critical",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Refund for a cancelled order",
+    "top_score": 82.9,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "billing",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e28",
+   "expect": {
+    "category": "account",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Locked out of my account",
+    "top_score": 81.8,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "account",
+    "got_priority": "medium",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e29",
+   "expect": {
+    "category": "technical",
+    "priority": "medium",
+    "difficulty": "complex",
+    "sensitive": false,
+    "kb_titles": []
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Reset your password",
+    "top_score": 82.2,
+    "hit": false,
+    "rank": null,
+    "covered": false
+   },
+   "classification": {
+    "got_category": "technical",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": false
+   }
+  },
+  {
+   "id": "e30",
+   "expect": {
+    "category": "refund",
+    "priority": "high",
+    "difficulty": "complex",
+    "sensitive": true,
+    "kb_titles": [
+     "Refund policy"
+    ]
+   },
+   "retrieval": {
+    "returned": 5,
+    "top_title": "Refund for a cancelled order",
+    "top_score": 89.5,
+    "hit": true,
+    "rank": 3,
+    "covered": true
+   },
+   "classification": {
+    "got_category": "refund",
+    "got_priority": "high",
+    "category_ok": true,
+    "priority_ok": true
+   }
+  }
+ ]
+}

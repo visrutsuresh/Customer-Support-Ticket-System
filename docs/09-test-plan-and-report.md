@@ -11,6 +11,7 @@ Three layers, in increasing cost:
 | Automated tests (`tests/`) | free, no model calls, no database | The gates: who may do what, what a resolved ticket refuses, what approve actually sends |
 | Live probes against a running instance | free | The auth and verification chain end to end, through real HTTP |
 | Benchmark runs (`bench.py`) | GPU money | Behaviour of the whole pipeline on a fixed ticket set, both modes. See [10-benchmark-report.md](10-benchmark-report.md) |
+| Labelled evaluation (`eval.py`) | free, or one model call per ticket | Whether the decisions were **right**: classification accuracy and retrieval hit rate against 30 labelled tickets |
 
 The automated layer runs with the application driven directly, with the authentication dependency and the store replaced, so no Postgres, no vector database and no model are needed. That is what keeps it free and fast.
 
@@ -65,7 +66,7 @@ These are named rather than hidden, and are the honest answer if a reviewer asks
 | No end-to-end test with a fake model | The full graph is only exercised by paid runs |
 | No tamper test on the audit chain | The verifier exists but nothing proves it fires |
 | No test asserting sensitive tickets never reach the cloud lane | This is the system's strongest privacy claim and it rests on reading the router, not on a test |
-| No labelled evaluation set | Classification accuracy and retrieval hit rate cannot be computed at all |
+| ~~No labelled evaluation set~~ | **Closed 2026-07-28:** `data/eval_set.jsonl` holds 30 labelled tickets and `eval.py` scores them. The retrieval half is free to re-run at any time; the classification half costs one model call per ticket. Results in [10-benchmark-report.md](10-benchmark-report.md) section 4 |
 
 The first six are a few hours of free work each. The last needs data creation and is the largest single item.
 
