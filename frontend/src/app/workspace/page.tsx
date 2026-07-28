@@ -10,6 +10,7 @@ type Ticket = {
   category: string | null;
   priority: string | null;
   action: string | null;
+  assignee: string | null;
   human_status: string;
   lifecycle: string;
   tags: string[];
@@ -106,11 +107,7 @@ export default function Queue() {
           <button
             key={s}
             onClick={() => setScope(s)}
-            className={`font-array text-[11px] px-3 py-1.5 rounded-[3px] border transition-colors ${
-              scope === s
-                ? "bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]"
-                : "text-[var(--mut)] border-[var(--line)] hover:border-[var(--ink)]"
-            }`}
+            className={`chip ${scope === s ? "chip-on" : ""}`}
           >
             {s.toUpperCase()}
           </button>
@@ -171,7 +168,7 @@ export default function Queue() {
               >
                 <Link
                   href={`/workspace/tickets/${t.ticket_id}`}
-                  className="grid grid-cols-[48px_1fr_120px_140px_80px_70px_110px] gap-4 items-center py-4 px-1 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:pl-3 transition-all"
+                  className="row grid-cols-[48px_1fr_110px_100px_130px_80px_70px_110px]"
                 >
                   <span className="font-array text-[10.5px] text-[var(--mut)] leading-relaxed">
                     {SOURCE_GLYPH[t.source ?? ""] ?? "▤"}{" "}
@@ -192,6 +189,9 @@ export default function Queue() {
                   <span className="font-array text-[10.5px] text-[var(--mut)]">
                     {(t.tags ?? []).slice(0, 3).join(" · ").toUpperCase() || "—"}
                   </span>
+                  <span className="badge">
+                    {t.assignee ? t.assignee.toUpperCase() : "—"}
+                  </span>
                   <span
                     className={`font-array text-[11px] flex items-center gap-2 ${st.label === "NEEDS REVIEW" ? "text-[var(--ox)]" : st.label === "ERROR" || st.label === "REJECTED" ? "text-[var(--rust)]" : "text-[var(--mut)]"}`}
                   >
@@ -205,7 +205,7 @@ export default function Queue() {
                     )}
                   </span>
                   <span
-                    className={`font-array text-[10.5px] ${t.priority?.toLowerCase() === "high" ? "text-[var(--ox)] font-semibold" : t.priority?.toLowerCase() === "critical" ? "bg-[var(--ox)] text-[var(--paper)] px-2 py-0.5 rounded-[2px] justify-self-start" : "text-[var(--mut)]"}`}
+                    className={`badge ${t.priority?.toLowerCase() === "high" ? "badge-warn" : t.priority?.toLowerCase() === "critical" ? "badge-crit justify-self-start" : ""}`}
                   >
                     {(t.priority ?? "—").toUpperCase()}
                   </span>
@@ -217,7 +217,7 @@ export default function Queue() {
                       : "—"}
                   </span>
                   <span
-                    className={`font-array text-[11px] tabular-nums ${sla.breached ? "text-[var(--rust)] font-semibold" : "text-[var(--mut)]"}`}
+                    className={`badge tabular-nums ${sla.breached ? "badge-bad font-semibold" : ""}`}
                   >
                     {sla.text}
                   </span>

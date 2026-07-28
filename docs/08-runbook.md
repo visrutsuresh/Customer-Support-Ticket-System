@@ -10,6 +10,8 @@ uv run uvicorn api:app --reload         # API on :8000
 cd frontend && npm run dev              # web app on :3000
 ```
 
+**One app at a time.** All three sibling systems serve their API on :8000 and their front end on :3000, and every front end hardcodes `http://localhost:8000`. Stop this app before starting a sibling, or its front end will silently talk to the wrong API. Database containers have distinct ports and can all stay up.
+
 Behind a proxy that intercepts TLS, set the exclusions **before** the backend and before any seed script, or the vector database calls hang and then fail:
 
 ```bash

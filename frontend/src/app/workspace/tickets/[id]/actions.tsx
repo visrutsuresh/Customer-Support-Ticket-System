@@ -33,19 +33,13 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="w-full border border-[var(--line)] focus:border-[var(--ox)] outline-none rounded-[3px] p-3 h-40 bg-[#FBF9F2] text-[13.5px] leading-relaxed"
+        className="input-box h-40 text-[13.5px] leading-relaxed"
       ></textarea>
       <div className="flex gap-2 mt-3">
-        <button
-          onClick={() => act("approve")}
-          className="bg-[var(--ox)] hover:bg-[var(--ox-2)] text-[var(--paper)] font-semibold text-[13px] px-5 py-2.5 rounded-[3px] active:scale-[0.98] transition"
-        >
+        <button onClick={() => act("approve")} className="btn">
           Approve &amp; send
         </button>
-        <button
-          onClick={saveEdit}
-          className="text-[var(--ox)] border border-[var(--ox)] font-semibold text-[13px] px-4 py-2.5 rounded-[3px] hover:bg-[var(--ox)] hover:text-[var(--paper)] transition-colors"
-        >
+        <button onClick={saveEdit} className="btn btn-outline">
           Save edit
         </button>
         <button
@@ -54,10 +48,7 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
         >
           Reject
         </button>
-        <button
-          onClick={() => act("resolve")}
-          className="ml-auto text-[var(--olive)] border border-[var(--olive)] font-semibold text-[13px] px-4 py-2.5 rounded-[3px] hover:bg-[var(--olive)] hover:text-[var(--paper)] transition-colors"
-        >
+        <button onClick={() => act("resolve")} className="btn btn-olive ml-auto">
           Mark resolved
         </button>
       </div>

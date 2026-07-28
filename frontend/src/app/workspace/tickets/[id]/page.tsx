@@ -120,7 +120,7 @@ export default function TicketDetail() {
           {(s.messages ?? [{ role: "customer", body: s.ticket.body }]).map((m, i) => (
             <div
               key={i}
-              className={`rise ${m.role === "internal" ? "bg-[var(--paper-2)] p-4 rounded-[3px]" : ""}`}
+              className={`rise ${m.role === "internal" ? "panel" : ""}`}
               style={{ "--i": i + 1 } as React.CSSProperties}
             >
               <div className="font-array text-[10.5px] text-[var(--mut)] mb-1.5">{who(m).toUpperCase()}</div>
@@ -144,12 +144,9 @@ export default function TicketDetail() {
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addNote()}
               placeholder="Add an internal note (customers never see these)"
-              className="flex-1 bg-transparent border-b border-[var(--line)] focus:border-[var(--ox)] outline-none py-2 text-[13.5px]"
+              className="input flex-1 text-[13.5px]"
             />
-            <button
-              onClick={addNote}
-              className="font-semibold text-[13px] text-[var(--ox)] border border-[var(--ox)] rounded-[3px] px-4 hover:bg-[var(--ox)] hover:text-[var(--paper)] transition-colors"
-            >
+            <button onClick={addNote} className="btn btn-outline">
               Note
             </button>
           </div>
@@ -189,11 +186,7 @@ export default function TicketDetail() {
               <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
               <button
                 onClick={reopen}
-                className={`mt-3 font-semibold text-[13px] px-4 py-2 rounded-[3px] border transition-colors ${
-                  reopenArmed
-                    ? "bg-[var(--rust)] text-[var(--paper)] border-[var(--rust)]"
-                    : "text-[var(--mut)] border-[var(--line)] hover:border-[var(--rust)] hover:text-[var(--rust)]"
-                }`}
+                className={`btn mt-3 ${reopenArmed ? "btn-armed" : "btn-quiet"}`}
               >
                 {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
               </button>
@@ -205,10 +198,7 @@ export default function TicketDetail() {
             <span className="font-array text-[10.5px] text-[var(--mut)]">TAGS</span>
             <div className="mt-2 flex flex-wrap gap-2 items-center">
               {(s.tags ?? []).map((tag) => (
-                <span
-                  key={tag}
-                  className="font-array text-[11px] border border-[var(--line)] rounded-[2px] px-2.5 py-1 hover:border-[var(--ox)] transition-colors"
-                >
+                <span key={tag} className="chip">
                   {tag.toUpperCase()}
                   {!locked && (
                     <button onClick={() => removeTag(tag)} className="ml-1.5 text-[var(--rust)]">
@@ -223,7 +213,7 @@ export default function TicketDetail() {
                   onChange={(e) => setNewTag(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTag()}
                   placeholder="+ TAG"
-                  className="font-array text-[11px] w-20 bg-transparent border border-dashed border-[var(--line)] focus:border-[var(--ox)] rounded-[2px] px-2.5 py-1 outline-none placeholder:text-[var(--mut)]"
+                  className="chip w-20 bg-transparent border-dashed focus:border-[var(--ox)] outline-none placeholder:text-[var(--mut)]"
                 />
               )}
             </div>

@@ -117,18 +117,12 @@ export default function RequestThread() {
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendReply()}
                 placeholder="Write a reply"
-                className="flex-1 bg-transparent border-b border-[var(--line)] focus:border-[var(--ox)] outline-none py-2 text-[14px]"
+                className="input flex-1 text-[14px]"
               />
-              <button
-                onClick={sendReply}
-                className="bg-[var(--ox)] hover:bg-[var(--ox-2)] text-[var(--paper)] font-semibold text-[13px] px-5 py-2 rounded-[3px] active:scale-[0.98] transition"
-              >
+              <button onClick={sendReply} className="btn">
                 Send
               </button>
-              <button
-                onClick={() => setRating(true)}
-                className="text-[var(--olive)] border border-[var(--olive)] font-semibold text-[13px] px-4 py-2 rounded-[3px] hover:bg-[var(--olive)] hover:text-[var(--paper)] transition-colors"
-              >
+              <button onClick={() => setRating(true)} className="btn btn-olive">
                 Resolve
               </button>
             </div>
@@ -142,13 +136,13 @@ export default function RequestThread() {
                   <button
                     key={n}
                     onClick={() => resolve(n)}
-                    className="w-9 h-9 font-array text-[13px] border border-[var(--line)] rounded-[3px] hover:bg-[var(--ox)] hover:text-[var(--paper)] hover:border-[var(--ox)] transition-colors"
+                    className="chip w-9 h-9 !p-0 text-[13px] hover:bg-[var(--ox)] hover:text-[var(--paper)] hover:border-[var(--ox)]"
                   >
                     {n}
                   </button>
                 ))}
               </div>
-              <button onClick={() => setRating(false)} className="mt-3 text-[12.5px] text-[var(--mut)] underline underline-offset-4">
+              <button onClick={() => setRating(false)} className="btn-link btn-link-mut mt-3 text-[12.5px]">
                 Never mind, keep it open
               </button>
             </div>
@@ -160,10 +154,7 @@ export default function RequestThread() {
               <p className="text-[13.5px] text-[var(--mut)] mt-3 max-w-[52ch]">
                 Not what you needed? Reopen this request and it goes straight back to the team.
               </p>
-              <button
-                onClick={reopenRequest}
-                className="mt-2 text-[13px] font-semibold text-[var(--ox)] border border-[var(--ox)] rounded-[3px] px-4 py-2 hover:bg-[var(--ox)] hover:text-[var(--paper)] transition-colors"
-              >
+              <button onClick={reopenRequest} className="btn btn-outline mt-2">
                 Reopen this request
               </button>
             </div>

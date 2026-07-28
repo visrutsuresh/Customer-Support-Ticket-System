@@ -2,6 +2,14 @@
 
 **Version 1, 2026-07-28.** Grouped by theme rather than by tag: this project has no version tags, 98 commits, first on 2026-07-05 and latest on 2026-07-28. Full detail is in the commit history.
 
+## 2026-07-28 later, Ledger refined
+
+- **The interface gained a component layer.** The styling already had a deliberate printed-paper identity and a full token set, but no named components, so every button and input was a hand-typed string of utility classes retyped across ten pages, and the pages had begun to drift apart. `globals.css` now defines the controls once (`.btn` and its variants, `.card`, `.panel`, `.input`, `.field`, `.badge`, `.chip`, `.row`), referencing only the existing tokens and the three font variables, and the five core pages (staff queue, staff ticket detail, customer thread, login, new request) were rewritten onto them. No endpoint changed, so the tests and both benchmark results stay valid by construction.
+- **A font swap is now a one-file job:** the components name only the font variables, so replacing the three families means dropping new files into the fonts folder and editing `fonts.ts`.
+- **Two dead pre-auth pages deleted.** One rendered the company metrics page to any visitor without a session (the API behind it did require one); the other duplicated the real staff ticket page. Neither was linked from anywhere.
+- **The queue now shows the assignee.** The backend always computed it; only the detail page displayed it.
+- Two literal colours that bypassed the token set were removed along the way.
+
 ## 2026-07-28, verification hard gate
 
 - Sign-in now requires a verified email address. An unverified attempt is refused with its own distinct reason, so the interface can tell it apart from a wrong password, and no session is issued.
@@ -53,4 +61,5 @@
 - The transcript intake format has a parser but no endpoint to reach it.
 - A private-lane outage ends in an error status rather than an escalation to a person.
 - Cloud token cost is not tracked, so full-tier runs under-report cost.
-- No labelled evaluation set, so classification accuracy and retrieval hit rate are unmeasured.
+- Retrieval finds the right article in the top five 100 percent of the time but puts it first only 36 percent of the time.
+- Merge, link, attachments and the templates library work and are tested at the API but still have no buttons on screen.

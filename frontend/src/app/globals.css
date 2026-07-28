@@ -58,6 +58,199 @@ h3 {
   animation-delay: calc(var(--i, 0) * 60ms);
 }
 
+/* ── component layer ─────────────────────────────────────────────
+   Ledger refined: one class per control, tokens and font vars only.
+   Never a literal colour or family below this line. */
+
+.btn {
+  font-family: var(--font-gsans), sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 9px 22px;
+  border-radius: 3px;
+  border: 1px solid var(--ox);
+  background: var(--ox);
+  color: var(--paper);
+  transition:
+    background-color 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+.btn:hover {
+  background: var(--ox-2);
+  border-color: var(--ox-2);
+}
+.btn:active {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+
+/* outline variants share the primary's box, swap the fill */
+.btn-outline,
+.btn-olive,
+.btn-quiet {
+  background: transparent;
+  padding: 8px 16px;
+}
+.btn-outline {
+  color: var(--ox);
+}
+.btn-outline:hover {
+  background: var(--ox);
+  border-color: var(--ox);
+  color: var(--paper);
+}
+.btn-olive {
+  color: var(--olive);
+  border-color: var(--olive);
+}
+.btn-olive:hover {
+  background: var(--olive);
+  color: var(--paper);
+}
+.btn-quiet {
+  color: var(--mut);
+  border-color: var(--line);
+}
+.btn-quiet:hover {
+  border-color: var(--rust);
+  color: var(--rust);
+  background: transparent;
+}
+.btn-armed {
+  background: var(--rust);
+  border-color: var(--rust);
+  color: var(--paper);
+}
+.btn-armed:hover {
+  background: var(--rust);
+  border-color: var(--rust);
+}
+
+.btn-link {
+  font-size: 13.5px;
+  color: var(--ox);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.btn-link-mut {
+  color: var(--mut);
+}
+
+/* the printed sheet: a heavy top rule opens every form or document */
+.card {
+  border-top: 2px solid var(--ink);
+  padding-top: 2rem;
+}
+
+/* soft inset block: internal notes, side panels */
+.panel {
+  background: var(--paper-2);
+  border-radius: 3px;
+  padding: 1rem;
+}
+
+.input {
+  width: 100%;
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--ox);
+}
+.input::placeholder {
+  color: var(--mut);
+}
+
+/* the boxed variant for long text */
+.input-box {
+  width: 100%;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 12px;
+  outline: none;
+}
+.input-box:focus {
+  border-color: var(--ox);
+}
+
+/* micro-label above an input */
+.field {
+  display: block;
+  font-family: var(--font-array), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mut);
+  margin-bottom: 4px;
+}
+
+/* status / severity marks */
+.badge {
+  font-family: var(--font-array), monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  color: var(--mut);
+}
+.badge-crit {
+  background: var(--ox);
+  color: var(--paper);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.badge-warn {
+  color: var(--ox);
+  font-weight: 600;
+}
+.badge-bad {
+  color: var(--rust);
+}
+.badge-ok {
+  color: var(--olive);
+}
+
+/* small bordered token: tags, filter switches */
+.chip {
+  font-family: var(--font-array), monospace;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 4px 10px;
+  color: var(--mut);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s,
+    color 0.15s;
+}
+.chip:hover {
+  border-color: var(--ink);
+}
+.chip-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* registry row: the queue's ruled line that shifts on hover */
+.row {
+  display: grid;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 4px;
+  border-bottom: 1px solid var(--line);
+  transition: all 0.15s;
+}
+.row:hover {
+  background: var(--paper-2);
+  padding-left: 12px;
+}
+
 /* indeterminate work bar: shown wherever a ticket is PROCESSING so the
    60-140s autonomous wait reads as alive, not stuck */
 .workbar {

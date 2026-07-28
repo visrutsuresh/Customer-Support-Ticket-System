@@ -14,13 +14,15 @@ Expect this order: start the containers, run the four seed scripts, start the AP
 2. [03-lld.md](03-lld.md) section 3 and 4, the pipeline and the decision rule, which is where all the judgement lives.
 3. [06-adr-log.md](06-adr-log.md) for why things are the way they are, especially the two-pipeline decision and the privacy lane.
 
-## 3. The five things that will surprise you
+## 3. The things that will surprise you
 
 1. **There are two pipelines**, chosen by an environment variable, and any change to pipeline internals has to be made in both in the same sitting. Forgetting this is how a feature has previously shipped in one mode only.
 2. **The two pipelines disagree about capitalisation.** The fixed one lower-cases every classification field; the autonomous one returns the model's raw wording. Any code reading a classification must lower-case first, or it will work in exactly one mode.
 3. **The model lane sleeps.** The first call after an idle period takes about a minute, and it costs real money to wake. Batch anything paid into one warm window.
 4. **The whole pipeline state is stored as one JSON column.** Adding a field to the state needs no migration; the queue's filter columns are the only normalised ones.
 5. **Corporate security tooling on a Windows machine interferes twice:** a local proxy hijacks the vector database's gRPC port unless localhost is excluded, and a content filter rewrites credential-shaped strings, so configuration files should be checked after any bulk edit.
+6. **All three sibling systems run on :8000 and :3000**, and every front end hardcodes `http://localhost:8000`. Run one app at a time; the database containers have distinct ports and can all stay up.
+7. **Styling goes through the component layer in `globals.css`.** New interface work should use the named components (`.btn`, `.card`, `.input`, `.badge` and friends), never a literal colour or font family; that is what keeps a font swap a one-file edit in `fonts.ts`.
 
 ## 4. Where the important logic lives
 

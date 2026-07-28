@@ -33,6 +33,7 @@ Customer ticket content and threads; account credentials; the model lane token; 
 | 12 | Prompt injection through ticket text, aiming to make the agent misbehave or call a tool | Write tools require a confirmation code derived from the ticket; the compliance review inspects the draft before anything is sent; the human gate stands for everything not auto-sent | **Not systematically tested.** A crafted ticket steering retrieval or tone is plausible |
 | 13 | Denial of service by flooding tickets | A per-run time cap stops one ticket jamming the queue | No rate limiting on ticket creation |
 | 14 | Secrets committed to the repository | Secrets live only in a git-ignored environment file; the repository holds blank placeholders | A careless paste remains possible; nothing scans commits |
+| 15 | Company metrics read without signing in | The pre-auth `/metrics` page, which fetched and rendered company metrics to any visitor with no cookie, was **deleted on 2026-07-28** along with a duplicate pre-auth ticket page. Metrics now live only behind the staff workspace | None known. The API's own metrics route still requires a session |
 
 ## 4. What would have to change before real users
 

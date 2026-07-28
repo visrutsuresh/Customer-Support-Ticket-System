@@ -30,7 +30,7 @@ Your requests list shows everything you have filed and its state. Open one to re
 
 ### The queue
 
-Signing in as staff opens the workspace. The queue lists live tickets with their status, category, priority, tags and age. Filter by status, category or tag, or search the text. A row showing a moving bar is still being processed.
+Signing in as staff opens the workspace. The queue lists live tickets with their status, category, priority, tags, assignee and age. Filter by status, category or tag, or search the text. A row showing a moving bar is still being processed.
 
 Administrators can also switch the scope to the archive; staff cannot, and instead see one customer's past tickets from inside that customer's live ticket.
 
@@ -46,11 +46,13 @@ Three actions:
 | **Edit** | Replace the wording, then send. If the reply had already gone out automatically, your edit corrects the thread record; the copy already delivered by email cannot be recalled |
 | **Reject** | Marks the draft unusable. Nothing is sent |
 
-You can also add an internal note, which the customer never sees, add or remove tags, attach a file, merge a duplicate into this ticket, or link a related one.
+You can also add an internal note, which the customer never sees, and add or remove tags.
+
+**API-only for now:** attaching a file, merging a duplicate into this ticket, and linking a related one all exist and are tested at the API, but have no buttons on screen yet. The same goes for the templates library below.
 
 ### Templates
 
-The templates library holds canned replies. Applying one replaces the current draft, which you can then edit before sending. Only administrators can create, change or delete templates.
+The templates library holds canned replies. Applying one replaces the current draft, which you can then edit before sending. Only administrators can create, change or delete templates. **The whole library is API-only today**: there is no templates screen, so it is exercised through the API documentation page rather than the workspace.
 
 ### Bringing work in from elsewhere
 

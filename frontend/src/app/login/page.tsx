@@ -41,7 +41,7 @@ export default function LoginPage() {
   if (inboxWait) {
     return (
       <main className="min-h-[100dvh] bg-[var(--paper)] text-[var(--ink)] flex items-center justify-center px-4">
-        <div className="w-full max-w-sm border-t-2 border-[var(--ink)] pt-8">
+        <div className="card w-full max-w-sm">
           <h1 className="text-2xl font-bold">Check your inbox</h1>
           <p className="text-sm text-[var(--mut)] mt-3 leading-relaxed">
             We sent a verification link to <b className="text-[var(--ink)]">{email}</b>. Open it to
@@ -52,7 +52,7 @@ export default function LoginPage() {
               await resendVerification(email);
               setResent(true);
             }}
-            className="mt-6 block text-sm text-[var(--ox)] underline underline-offset-4"
+            className="btn-link mt-6 block"
           >
             {resent ? "Link sent again" : "Resend the link"}
           </button>
@@ -62,7 +62,7 @@ export default function LoginPage() {
               setResent(false);
               setMode("signin");
             }}
-            className="mt-3 text-sm text-[var(--mut)] underline underline-offset-4"
+            className="btn-link btn-link-mut mt-3"
           >
             Back to sign in
           </button>
@@ -73,7 +73,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-[100dvh] bg-[var(--paper)] text-[var(--ink)] flex items-center justify-center px-4">
-      <form onSubmit={submit} className="w-full max-w-sm border-t-2 border-[var(--ink)] pt-8">
+      <form onSubmit={submit} className="card w-full max-w-sm">
         <div className="mb-8">
           <div className="w-10 h-10 bg-[var(--ox)] text-[var(--paper)] flex items-center justify-center rounded-[3px] mb-3">
             <svg viewBox="0 0 24 18" width="26" height="20" fill="currentColor" aria-label="Nimbus cloud mark">
@@ -88,22 +88,22 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <label className="block text-[11px] tracking-widest uppercase text-[var(--mut)] mb-1">Email</label>
+        <label className="field">Email</label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--ox)] outline-none py-2 mb-5"
+          className="input mb-5"
         />
-        <label className="block text-[11px] tracking-widest uppercase text-[var(--mut)] mb-1">Password</label>
+        <label className="field">Password</label>
         <input
           type="password"
           required
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full bg-transparent border-b border-[var(--line)] focus:border-[var(--ox)] outline-none py-2 mb-6"
+          className="input mb-6"
         />
 
         {error && <p className="text-sm text-[var(--rust)] mb-4">{error}</p>}
@@ -112,14 +112,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="bg-[var(--ox)] hover:bg-[var(--ox-2)] text-[var(--paper)] font-semibold text-sm px-6 py-2.5 rounded-[3px] active:scale-[0.98] transition disabled:opacity-50"
+            className="btn"
           >
             {busy ? "One moment" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
           <button
             type="button"
             onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-            className="text-sm text-[var(--ox)] underline underline-offset-4"
+            className="btn-link"
           >
             {mode === "signin" ? "New here? Create an account" : "Have an account? Sign in"}
           </button>
