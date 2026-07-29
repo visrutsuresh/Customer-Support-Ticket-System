@@ -53,7 +53,7 @@ function Badge({ kind }: { kind: "sample" | "estimate" }) {
           ? "Illustrative placeholder, not measured from real data"
           : "Computed estimate, not a billed figure"
       }
-      className="ml-2 rounded-full border border-[var(--line)] px-2 py-[1px] text-[10px] uppercase tracking-[0.14em] text-[var(--mut)]"
+      className="chip ml-2 rounded-full py-[1px]"
     >
       {label}
     </span>
@@ -72,13 +72,13 @@ function Tile({
   badge?: "sample" | "estimate";
 }) {
   return (
-    <div className="border border-[var(--line)] rounded-lg p-4">
-      <div className="text-3xl font-bold">{value}</div>
-      <div className="text-sm text-[var(--mut)] flex items-center">
+    <div className="panel">
+      <div className="text-[30px] font-bold leading-none">{value}</div>
+      <div className="text-[13px] text-[var(--mut)] flex items-center mt-1.5">
         {label}
         {badge && <Badge kind={badge} />}
       </div>
-      {sub && <div className="mt-1 text-xs text-[var(--mut)]">{sub}</div>}
+      {sub && <div className="mt-1 font-array text-[10px] text-[var(--mut)] leading-relaxed">{sub}</div>}
     </div>
   );
 }
@@ -100,11 +100,14 @@ export default function PerformanceDashboard() {
   const cost = m.cost;
 
   return (
-    <main className="max-w-4xl mx-auto p-8">
-      <h1 className="text-2xl font-semibold mb-1">Performance Dashboard</h1>
-      <p className="text-sm text-[var(--mut)] mb-6">
-        Live figures computed from resolved tickets. Averages refresh every 15s and recompute as volume grows.
-      </p>
+    <main className="max-w-5xl px-10 py-9">
+      <div className="border-b border-[var(--ink)] pb-4">
+        <h1 className="text-[28px] font-bold leading-tight">Performance</h1>
+        <p className="font-array text-[11px] text-[var(--mut)] mt-2">
+          LIVE FIGURES FROM RESOLVED TICKETS · REFRESHED EVERY 15S
+        </p>
+      </div>
+      <div className="h-6" />
 
       {/* REAL: volume + decision outcomes */}
       <div className="grid grid-cols-4 gap-4">
@@ -185,17 +188,17 @@ export default function PerformanceDashboard() {
         />
       </div>
 
-      <p className="mt-4 text-xs text-[var(--mut)]">
+      <p className="mt-4 text-[12px] text-[var(--mut)] max-w-[80ch]">
         Cost is a labelled estimate: Modal bills GPU wall-clock time, and app-side wall-clock is used as a proxy for
         GPU-active seconds. CSAT improvement is a clearly-labelled sample, not a measured figure.
       </p>
 
-      <h2 className="text-lg font-semibold mt-8 mb-3">By category</h2>
-      <ul className="space-y-2">
+      <h2 className="text-[19px] font-bold mt-9 pt-4 border-t border-[var(--ink)]">By category</h2>
+      <ul className="mt-1">
         {m.by_category.map((c) => (
-          <li key={c.category} className="flex justify-between border border-[var(--line)] rounded-lg p-3">
-            <span>{c.category}</span>
-            <span className="font-medium">{c.n}</span>
+          <li key={c.category} className="row grid-cols-[1fr_auto]">
+            <span className="text-[14px]">{c.category}</span>
+            <span className="font-array text-[13px] font-semibold">{c.n}</span>
           </li>
         ))}
       </ul>

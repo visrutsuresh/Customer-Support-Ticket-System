@@ -184,6 +184,7 @@ uv run python demo.py                    # runs the pipeline over 7 sample ticke
 api.py              FastAPI backend (create/list/approve/reject/edit)
 demo.py             CLI demo over sample tickets
 seed_kb.py          seed the Weaviate knowledge base
+seed_templates.py   seed the canned replies behind the macro chips
 docker-compose.yml  Postgres + Weaviate
 policy.md           compliance rules the review agent enforces
 app/

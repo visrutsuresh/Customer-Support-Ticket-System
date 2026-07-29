@@ -33,12 +33,9 @@ export default function PortalHome() {
           <p className="text-[var(--mut)] mt-2 mb-8 max-w-[46ch] rise" style={{ "--i": 1 } as React.CSSProperties}>
             Write to us any hour. Our system drafts the answer, a person signs off, and the reply comes back the way you sent it.
           </p>
-          <div className="flex items-baseline border-t border-[var(--ink)] pt-5 rise" style={{ "--i": 2 } as React.CSSProperties}>
+          <div className="card flex items-baseline rise" style={{ "--i": 2 } as React.CSSProperties}>
             <h2 className="text-[19px] font-bold">Your requests</h2>
-            <Link
-              href="/new"
-              className="ml-auto bg-[var(--ox)] hover:bg-[var(--ox-2)] text-[var(--paper)] font-semibold text-[13px] px-4 py-2 rounded-[3px] active:scale-[0.98] transition"
-            >
+            <Link href="/new" className="btn ml-auto">
               + New request
             </Link>
           </div>

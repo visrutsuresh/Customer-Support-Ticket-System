@@ -4,6 +4,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import Actions from "./actions";
+import Attachments from "./attachments";
+import Related from "./related";
 
 type Msg = { role: string; body: string };
 type State = {
@@ -15,6 +17,9 @@ type State = {
   tags?: string[];
   lifecycle?: string;
   human_status?: string;
+  related?: string[];
+  merged_from?: string[];
+  merged_into?: string | null;
 };
 
 type HistoryRow = { ticket_id: string; subject: string; human_status: string; lifecycle: string; created_at: string | null };
@@ -218,6 +223,15 @@ export default function TicketDetail() {
               )}
             </div>
           </div>
+          <Related
+            id={id}
+            related={s.related ?? []}
+            mergedFrom={s.merged_from ?? []}
+            mergedInto={s.merged_into ?? null}
+            locked={locked}
+            onChange={load}
+          />
+          <Attachments id={id} locked={locked} />
           {history.length > 0 && (
             <div className="border-t border-[var(--line)] mt-6 pt-4">
               <span className="font-array text-[10.5px] text-[var(--mut)]">
