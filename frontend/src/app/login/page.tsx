@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { login, register, resendVerification, NotVerifiedError } from "@/lib/useUser";
+import { login, register } from "@/lib/useUser";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,64 +11,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [inboxWait, setInboxWait] = useState(false);
-  const [resent, setResent] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      if (mode === "signup") {
-        await register(email, password);
-        setInboxWait(true); // account exists; the verification link is on its way
-        return;
-      }
+      // signing up creates the account but opens no session, so sign in straight after
+      if (mode === "signup") await register(email, password);
       await login(email, password);
       const me = await api("/users/me");
       router.push(me.role === "customer" ? "/" : "/workspace");
     } catch (err) {
-      if (err instanceof NotVerifiedError) {
-        setInboxWait(true); // same screen as signup: the account exists, the inbox is unproved
-        return;
-      }
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
-  }
-
-  if (inboxWait) {
-    return (
-      <main className="min-h-[100dvh] bg-[var(--paper)] text-[var(--ink)] flex items-center justify-center px-4">
-        <div className="card w-full max-w-sm">
-          <h1 className="text-2xl font-bold">Check your inbox</h1>
-          <p className="text-sm text-[var(--mut)] mt-3 leading-relaxed">
-            We sent a verification link to <b className="text-[var(--ink)]">{email}</b>. Open it to
-            prove the inbox is yours. You cannot sign in until you do.
-          </p>
-          <button
-            onClick={async () => {
-              await resendVerification(email);
-              setResent(true);
-            }}
-            className="btn-link mt-6 block"
-          >
-            {resent ? "Link sent again" : "Resend the link"}
-          </button>
-          <button
-            onClick={() => {
-              setInboxWait(false);
-              setResent(false);
-              setMode("signin");
-            }}
-            className="btn-link btn-link-mut mt-3"
-          >
-            Back to sign in
-          </button>
-        </div>
-      </main>
-    );
   }
 
   return (

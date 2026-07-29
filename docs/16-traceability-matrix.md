@@ -64,4 +64,4 @@ Legend: **MET** implemented; **PARTIAL** intent covered but a stated piece is mi
 
 ## Test coverage summary
 
-A test layer exists (ten tests, free, no model calls) and covers the gates: verification, ownership, roles, the resolved lock, the reopen path, and what approve sends. The six tests named in the original plan for the rule functions, the parsers, agent contracts, the tamper check and the sensitive-never-cloud assertion **do not exist yet**. That is the honest state, and the two most valuable to add are the tamper test and the sensitive-never-cloud test, because they are the two claims a reviewer is most likely to challenge.
+A test layer exists (nine tests, free, no model calls) and covers the gates: ownership, roles, the resolved lock, the reopen path, and what approve sends. The six tests named in the original plan for the rule functions, the parsers, agent contracts, the tamper check and the sensitive-never-cloud assertion **do not exist yet**. That is the honest state, and the two most valuable to add are the tamper test and the sensitive-never-cloud test, because they are the two claims a reviewer is most likely to challenge.

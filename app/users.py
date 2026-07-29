@@ -44,32 +44,6 @@ async def get_user_db():
 
 class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = SECRET
-    verification_token_secret = SECRET
-
-    async def on_after_register(self, user: User, request=None):
-        # open signup is customer-only; a fresh customer must prove the inbox is theirs
-        # before they can file or read tickets (the claim-any-email hole)
-        if user.role == "customer" and not user.is_verified:
-            try:
-                await self.request_verify(user, request)
-            except Exception as e:
-                print(f"[verify] could not start verification for {user.email}: {e}", flush=True)
-
-    async def on_after_request_verify(self, user: User, token: str, request=None):
-        from app.email_channel import send_email  # local import: email creds are optional at boot
-
-        # a blank value in the file must fall back too, not just a missing key
-        base = os.getenv("FRONTEND_URL") or "http://localhost:3000"
-        body = (
-            "Welcome! Confirm this is your inbox by opening the link below.\n\n"
-            f"{base}/verify?token={token}\n\n"
-            "If you did not sign up, ignore this email."
-        )
-        try:
-            send_email(user.email, "Verify your email", body)
-        except Exception as e:
-            # mail being down must never break signup; the user can request a resend
-            print(f"[verify] could not send verification email to {user.email}: {e}", flush=True)
 
 
 async def get_user_manager(user_db=Depends(get_user_db)):
@@ -86,7 +60,7 @@ def get_jwt_strategy() -> JWTStrategy:
 auth_backend = AuthenticationBackend(name="cookie", transport=cookie_transport, get_strategy=get_jwt_strategy)
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](get_user_manager, [auth_backend])
-current_user = fastapi_users.current_user(active=True, verified=True)
+current_user = fastapi_users.current_user(active=True)
 
 
 def require_staff(user: User = Depends(current_user)) -> User:

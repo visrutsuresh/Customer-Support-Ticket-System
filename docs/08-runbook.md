@@ -24,10 +24,11 @@ Stop with `Ctrl-C` in each terminal, then `docker compose down` (without `-v`, w
 
 | Command | Effect |
 |---|---|
-| `uv run python seed_users.py` | Creates the staff, admin and demo customer accounts. Idempotent: existing accounts are repaired rather than duplicated, including their verified flag |
+| `uv run python seed_users.py` | Creates the staff, admin and demo customer accounts. Idempotent: existing accounts have their role corrected rather than being duplicated |
 | `uv run python seed_kb.py` | Creates and fills the knowledge collection |
 | `uv run python kb_import.py` | Imports the larger corpus of articles and past tickets, offline |
 | `uv run python seed_data.py`, `seed_universe.py` | Synthetic customers, orders and tickets for the demo world |
+| `uv run python seed_templates.py` | Five canned replies, which are what the macro chips on a ticket offer. Idempotent, and skipped names are reported. **Without it the macro row renders nothing**, so the feature reads as missing rather than unused |
 
 After any `docker compose down -v`, all four must be run again.
 
@@ -61,10 +62,6 @@ The pipeline runs in the background with a 180 second cap and two attempts. If b
 ### Everything returns 401 after a restart
 
 `AUTH_SECRET` changed, so existing cookies no longer verify. Sign in again.
-
-### Staff cannot sign in, and the reason is not the password
-
-Their account is not marked verified. Re-run `seed_users.py`, which repairs the flag on accounts that already exist.
 
 ### Database authentication failed on startup
 

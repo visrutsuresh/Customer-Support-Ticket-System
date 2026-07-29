@@ -86,6 +86,8 @@
 
 ## ADR-010. Hard-gate sign-in on a verified email address
 
+> **REVERSED 2026-07-29 by ADR-014.** Kept here in full because the reasoning still stands and the hole it closed is now open again by choice.
+
 **Context.** Open signup let anyone claim any address, and a ticket's owner is identified by their address.
 **Options.** Verify but let unverified users look around; gate reading and filing; gate sign-in itself.
 **Decision.** Gate sign-in. An account cannot hold a session until the inbox is proved. A failed verification email never blocks signup, and a resend endpoint answers the same way whether or not the address exists, so it cannot be used to discover accounts.
@@ -98,3 +100,15 @@
 **Context.** The legal and governance systems were copy-forked from this one, so several modules exist three times.
 **Decision.** Keep three repositories and share through one installable `core` package. The extraction is scheduled after the current deadline.
 **Consequences.** Documented in full, with the measured duplication, in `Core-Sharing-Decision.md` in the planning repository.
+
+---
+
+## ADR-014. Remove email verification, reversing ADR-010
+
+**Context.** ADR-010 gated sign-in on a proved inbox. In practice the gate cost more than it bought for this system: every demonstration needed a real inbox round trip before a customer account could do anything, the mail path is the least reliable dependency in the stack, and the whole feature existed to protect a synthetic support desk with no real customer data in it.
+
+**Options.** Keep it as built; keep the machinery but stop gating sign-in; auto-verify demo accounts and leave the control real for everyone else; remove it entirely.
+
+**Decision.** Remove it entirely, by the CEO's explicit call after the alternatives were put to him. Gone: the verification emailer, the `/auth/verify` and `/auth/request-verify-token` routes, `requires_verification` on the login router, the `_require_verified` check on the three customer paths, the verify screen and the check-your-inbox screen. Registering now signs you straight in.
+
+**Consequences.** The hole ADR-010 closed is open again, and it is a real one: **open signup means anyone can register any address they do not own.** Because a customer's tickets are matched by their account address, a registrant could claim an address belonging to somebody else and see tickets filed from it. This is accepted for a demonstration system with synthetic data and no public deployment; it would have to be closed again before any real use, and re-reading ADR-010 is the way to do that. Two smaller effects: `FRONTEND_URL` became dead configuration and was removed, and the auth library's `is_verified` column is now inert but left in place, since dropping a library-owned column would need a migration for nothing. The suite went from 10 tests to 9: the test asserting an unverified customer cannot file was deleted rather than inverted, because the behaviour it guarded no longer exists.

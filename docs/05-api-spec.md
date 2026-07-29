@@ -4,15 +4,13 @@
 
 ## 1. Authentication
 
-Sessions are a signed cookie named `enklima`, valid for seven days. Every endpoint below except `/`, `/config` and the auth routes requires an account that is **active and verified**.
+Sessions are a signed cookie named `enklima`, valid for seven days. Every endpoint below except `/`, `/config` and the auth routes requires an **active** account. Email verification was removed on 2026-07-29 (ADR-014), so an account's address is asserted, never proved.
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/auth/register` | `{email, password}` | 201 with the new account, always role `customer`, unverified |
-| POST | `/auth/login` | form `username`, `password` | 204 and a session cookie; 400 `LOGIN_BAD_CREDENTIALS`; 400 `LOGIN_USER_NOT_VERIFIED` |
+| POST | `/auth/register` | `{email, password}` | 201 with the new account, always role `customer`. Opens no session, so the client signs in straight after |
+| POST | `/auth/login` | form `username`, `password` | 204 and a session cookie; 400 `LOGIN_BAD_CREDENTIALS` |
 | POST | `/auth/logout` | none | 204 |
-| POST | `/auth/request-verify-token` | `{email}` | 202 always, whether or not the address exists |
-| POST | `/auth/verify` | `{token}` | 200 with the verified account; 400 on a used, tampered or expired token |
 | GET | `/users/me` | none | 200 with the current account |
 
 Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (staff powers plus templates and the archive).
@@ -28,7 +26,7 @@ Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (s
 
 | Method | Path | Who | Notes |
 |---|---|---|---|
-| POST | `/tickets` | any verified account | Returns immediately with `{ticket_id, status: "processing"}`; the pipeline runs in the background. A customer's identity always overrides any address in the payload |
+| POST | `/tickets` | any signed-in account | Returns immediately with `{ticket_id, status: "processing"}`; the pipeline runs in the background. A customer's identity always overrides any address in the payload |
 | GET | `/my/tickets` | customer | The caller's own tickets |
 | GET | `/tickets` | staff | The queue. Filters: `status`, `category`, `tag`, `q` (free text), `scope` (`live` for everyone, anything else is admin only, 403 otherwise) |
 | GET | `/tickets/{id}` | staff | The full stored state |
@@ -85,9 +83,9 @@ A resolved ticket is locked: approve, reject, edit, note and tag all return 409.
 | Code | Meaning here |
 |---|---|
 | 200, 201, 202, 204 | Success, created, accepted, success with no body |
-| 400 | Bad credentials, unverified login, invalid merge or link, bad attachment |
-| 401 | No session, or a session for an account that is no longer active and verified |
-| 403 | Wrong role, someone else's ticket, unverified customer, archive browsing as non-admin |
+| 400 | Bad credentials, invalid merge or link, bad attachment |
+| 401 | No session, or a session for an account that is no longer active |
+| 403 | Wrong role, someone else's ticket, archive browsing as non-admin |
 | 404 | Unknown ticket, template, or attachment |
 | 409 | The ticket is resolved and locked, or not reopenable |
 | 413 | Attachment above 5 MB |

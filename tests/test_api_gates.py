@@ -21,8 +21,8 @@ import api
 from app.users import current_user
 
 
-def fake_user(role="staff", verified=True, email="dana@nimbus.dev"):
-    return SimpleNamespace(role=role, email=email, is_verified=verified, is_active=True)
+def fake_user(role="staff", email="dana@nimbus.dev"):
+    return SimpleNamespace(role=role, email=email, is_active=True)
 
 
 @pytest.fixture
@@ -79,18 +79,11 @@ def test_approve_resolved_is_locked(client, monkeypatch):
     assert client.post("/tickets/T-1/approve").status_code == 409
 
 
-def test_unverified_customer_cannot_file(client, monkeypatch):
-    monkeypatch.setattr(api.store, "save_pending", lambda *a: pytest.fail("must not save"))
-    as_user(fake_user(role="customer", verified=False))
-    r = client.post("/tickets", json={"subject": "s", "body": "b", "source": "form"})
-    assert r.status_code == 403
-
-
-def test_verified_customer_can_file(client, monkeypatch):
+def test_customer_can_file(client, monkeypatch):
     saved = []
     monkeypatch.setattr(api.store, "save_pending", lambda *a: saved.append(a))
     monkeypatch.setattr(api, "_process", lambda *a, **k: None)  # no pipeline in tests
-    as_user(fake_user(role="customer", verified=True))
+    as_user(fake_user(role="customer"))
     r = client.post("/tickets", json={"subject": "s", "body": "b", "source": "form"})
     assert r.status_code == 200
     assert len(saved) == 1

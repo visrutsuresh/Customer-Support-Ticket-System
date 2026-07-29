@@ -18,6 +18,7 @@ Likelihood and impact are low, medium or high. Exposure is the pair read togethe
 | R-8 | Corporate security tooling on the work machine breaks local development in new ways | Medium | Low | Known workarounds are documented: exclude localhost from the proxy, and never write credential-shaped strings through the editor | Build owner |
 | R-9 | Documentation drifts from the code as the last week of changes land | Medium | Low | Every document in this set is dated and states what it was checked against; the traceability matrix is the piece to re-check first | Build owner |
 | R-10 | No rate limiting on sign-in or ticket creation | Low here, High in production | Medium | Accepted for a single-machine demonstration, named as a blocker for real use in the security review | Build owner |
+| R-11 | Anyone can sign up claiming an address they do not own, and read the tickets filed from it | Low here, High in production | High | **Currently unmitigated by choice.** This was closed on 2026-07-28 by gating sign-in on a verified inbox, and reopened on 2026-07-29 when that gate was removed (ADR-014). Accepted for a synthetic, non-public demonstration; ADR-010 records the design to restore before any real use | Build owner |
 
 ## Closed risks
 
@@ -26,8 +27,8 @@ Likelihood and impact are low, medium or high. Exposure is the pair read togethe
 | C-1 | The private model lane could not be hosted anywhere available | Serverless GPU, deployed from the personal machine, reachable from both as an HTTPS endpoint |
 | C-2 | Cold starts exceeded the platform timeout, so the lane could never answer | Timeout stack raised in the right order, and later a smaller model chosen that loads in about a minute |
 | C-3 | Parallel agents woke a second GPU container and burned the budget | The lane is pinned to a single container and calls are serialised client-side |
-| C-4 | Anyone could sign up claiming any address and read that person's tickets | Sign-in hard-gated on a verified inbox, 2026-07-28 |
-| C-5 | The verification gate locked out every seeded staff account | The seeder now repairs the verified flag on accounts that already exist, found by testing before it reached a demonstration |
+| C-4 | Anyone could sign up claiming any address and read that person's tickets | Closed 2026-07-28 by hard-gating sign-in on a verified inbox. **REOPENED 2026-07-29** when that gate was removed by decision; it is now tracked as R-11 above |
+| C-5 | The verification gate locked out every seeded staff account | Fixed 2026-07-28, then made moot 2026-07-29 when the gate was removed |
 | C-6 | Approving an escalated ticket sent nothing to the customer | Fixed, and pinned by the first test in the suite |
 | C-7 | The repository had no automated tests at all | A gate-focused suite exists and runs free in about two seconds |
 | C-8 | Quality claims could not be defended, because no labelled evaluation set existed | 30 labelled tickets plus `eval.py`, 2026-07-28. Classification accuracy and retrieval hit rate are now numbers, and the retrieval half re-runs for free |

@@ -26,9 +26,8 @@
 | Name | Required | Meaning |
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres connection string. Use `127.0.0.1` rather than `localhost` to force IPv4 |
-| `AUTH_SECRET` | yes | Signs session cookies and verification tokens. Changing it logs everyone out and invalidates outstanding verification links |
+| `AUTH_SECRET` | yes | Signs session cookies and password-reset tokens. Changing it logs everyone out |
 | `AGENT_MODE` | no, defaults `deterministic` | `deterministic` or `autonomous` |
-| `FRONTEND_URL` | no, defaults `http://localhost:3000` | Base address used to build the verification link in the email |
 | `BRAND_NAME`, `BRAND_TAGLINE` | no | Client branding shown in the portal |
 
 ### Email channel
@@ -63,7 +62,6 @@ Mail is optional. Without it, ticket intake and replies still work in-app; only 
 |---|---|
 | The API will not start, complaining about a missing key | A lane URL or token is absent |
 | Database authentication failed | `DATABASE_URL` disagrees with the compose file's credentials. Postgres only applies those on a first initialisation of an empty volume, so the two must be made to agree, and the volume re-initialised if it was created with the old value |
-| Verification links point nowhere sensible | `FRONTEND_URL` is set to an empty value |
 | Everyone is signed out after a restart | `AUTH_SECRET` changed |
 | Ticket processing and seeding hang, then fail | A local proxy is intercepting the vector database's gRPC port. Exclude localhost, see [08-runbook.md](08-runbook.md) |
 

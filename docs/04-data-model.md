@@ -38,7 +38,7 @@ The `state` column is deliberately the whole object rather than a normalised exp
 
 ### Accounts
 
-Managed by the auth library in its own table: id, email, hashed password, active flag, verified flag, superuser flag, and a `role` column of `customer`, `staff`, or `admin`. Passwords are stored only as hashes. Seeded accounts are marked verified by the seeder.
+Managed by the auth library in its own table: id, email, hashed password, active flag, verified flag, superuser flag, and a `role` column of `customer`, `staff`, or `admin`. Passwords are stored only as hashes. **The verified flag is inert:** it belongs to the auth library's own model, and since email verification was removed on 2026-07-29 (ADR-014) nothing writes or reads it. It is left in place because dropping a library-owned column would need a migration for no gain.
 
 ## 2. Weaviate, collection `Knowledge`
 

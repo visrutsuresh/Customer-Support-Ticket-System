@@ -59,7 +59,7 @@ There is no automatic deletion, no retention schedule, and no subject-access or 
 
 ## 7. Access
 
-Three roles. A customer reaches only tickets matching their verified address. Staff reach the live queue and, from a live ticket, that one customer's past tickets. Administrators reach everything including the raw archive and the templates. Internal notes are never exposed to customers by any route.
+Three roles. A customer reaches only tickets matching their account address, which since 2026-07-29 is asserted at signup rather than proved (ADR-014). Staff reach the live queue and, from a live ticket, that one customer's past tickets. Administrators reach everything including the raw archive and the templates. Internal notes are never exposed to customers by any route.
 
 ## 8. Learning loop and privacy
 

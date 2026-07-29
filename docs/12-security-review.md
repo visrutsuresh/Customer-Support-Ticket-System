@@ -19,7 +19,7 @@ Customer ticket content and threads; account credentials; the model lane token; 
 
 | # | Threat | Control today | Residual risk |
 |---|---|---|---|
-| 1 | Someone signs up claiming an address they do not own, then reads that person's tickets | Sign-in is gated on a verified inbox; ticket ownership is matched on the account address, never on a form field | The verification email itself can be intercepted if the mailbox is compromised |
+| 1 | Someone signs up claiming an address they do not own, then reads that person's tickets | **Only partly mitigated.** Ticket ownership is matched on the account address, never on a form field, so a form cannot be used to claim someone else's tickets. But since email verification was removed on 2026-07-29 (ADR-014), registering the address itself is unchecked | **This is the largest open hole in the system.** It was closed on 2026-07-28 and deliberately reopened; see R-11 in the risk register. Restoring the gate is the fix, and ADR-010 records how it was built |
 | 2 | Account enumeration through the resend endpoint | It answers 202 for every address, real or not | None material |
 | 3 | Password guessing | Passwords are stored hashed by the auth library | **No rate limiting or lockout.** This is the clearest missing control |
 | 4 | Session theft | Signed cookie, seven-day life, secret in the environment | The cookie is not marked secure because the demo runs over plain HTTP locally. That must change before any real deployment |

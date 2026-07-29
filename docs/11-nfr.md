@@ -36,7 +36,7 @@ There is no availability target. Everything runs on one machine, both data store
 | A sensitive ticket never reaches a third-party API | Met by construction: the lane decision precedes every model call and the private lane has no code path to a cloud provider |
 | No fallback from the private lane to the cloud when it is down | Met. The failure surfaces as an error rather than a silent downgrade |
 | Outbound replies carry no personal data | Enforced by a scan of the draft during review |
-| Only verified accounts hold a session | Met |
+| Only active accounts hold a session | Met. Email verification was removed 2026-07-29 (ADR-014), so an address is asserted, not proved |
 | Customers see only their own tickets, staff never see raw archives | Met |
 
 Full detail in [12-security-review.md](12-security-review.md) and [13-privacy-and-data-handling.md](13-privacy-and-data-handling.md).

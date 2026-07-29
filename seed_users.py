@@ -25,13 +25,12 @@ async def main():
         for email, password, role in SEEDS:
             try:
                 user = await mgr.create(UserCreate(email=email, password=password))
-                # seeded accounts skip inbox verification: they are ours by definition
-                await db.update(user, {"role": role, "is_verified": True})
+                await db.update(user, {"role": role})
                 print(f"created {email} as {role}")
             except UserAlreadyExists:
-                # the flag matters now, so repair accounts seeded before verification existed
+                # re-running must still correct the role on an account that already exists
                 existing = await db.get_by_email(email)
-                await db.update(existing, {"role": role, "is_verified": True})
+                await db.update(existing, {"role": role})
                 print(f"repaired {email} as {role}")
 
 

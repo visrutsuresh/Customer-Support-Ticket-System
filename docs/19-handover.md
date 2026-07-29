@@ -47,7 +47,7 @@ Expect this order: start the containers, run the four seed scripts, start the AP
 ## 6. Operational cautions
 
 - Never run `docker compose down -v` unless you intend to lose the data and re-seed.
-- Changing the authentication secret signs everyone out and invalidates outstanding verification links.
+- Changing the authentication secret signs everyone out.
 - The database password in the environment file and the one in the compose file must agree; Postgres only applies credentials when it first initialises an empty volume.
 - Seeded development credentials are in the `README.md` and must be rotated before the system is reachable by anyone else.
 

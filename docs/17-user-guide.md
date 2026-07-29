@@ -6,7 +6,7 @@
 
 ### Creating an account
 
-Open the portal, choose to sign up, and enter an email address and a password. A verification link is sent to that address. **You cannot sign in until you open it.** If it does not arrive, use "Resend the link" on the same screen.
+Open the portal, choose to sign up, and enter an email address and a password. You are signed in straight away: there is no email to open and nothing to confirm.
 
 ### Filing a request
 
@@ -48,11 +48,26 @@ Three actions:
 
 You can also add an internal note, which the customer never sees, and add or remove tags.
 
-**API-only for now:** attaching a file, merging a duplicate into this ticket, and linking a related one all exist and are tested at the API, but have no buttons on screen yet. The same goes for the templates library below.
+### Related tickets
 
-### Templates
+Two different jobs sit in the side panel, and they are not the same thing:
 
-The templates library holds canned replies. Applying one replaces the current draft, which you can then edit before sending. Only administrators can create, change or delete templates. **The whole library is API-only today**: there is no templates screen, so it is exercised through the API documentation page rather than the workspace.
+| Action | Effect |
+|---|---|
+| **Link** | A cross-reference. Both tickets stay open and stay separate. Useful when two customers report the same outage |
+| **Fold in** | Folds another ticket into this one and **resolves** that other ticket. The button arms on the first press and fires on the second, because it closes something |
+
+Existing relations show as chips: `↔` for a link, `◀` for a ticket that was folded in. If this ticket was itself folded into another, the panel says so and links you there. A ticket already merged once cannot be merged again.
+
+### Attachments
+
+The side panel lists every file on the ticket with its size, and each name downloads it. **Attach a file** accepts images, PDF, plain text and CSV up to 5 MB; anything else is refused with the reason stated on screen. A resolved ticket is locked, so the upload button disappears.
+
+### Templates, used as macros
+
+The templates library holds canned replies. On a ticket, the saved replies appear as a row of macro chips above the draft: click one and it replaces the draft, which you can then edit before sending. The chip stays marked so you can see which macro is in the box.
+
+Only administrators can create, change or delete templates, and **authoring is still API-only**: there is no templates management screen, so the library is maintained through the API documentation page. Applying them is fully on screen.
 
 ### Bringing work in from elsewhere
 

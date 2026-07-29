@@ -19,7 +19,7 @@
 | `app/pii.py` | ~36 | Pattern scan for personal data, including a card checksum |
 | `app/roster.py` | ~27 | Assignee selection on escalation |
 | `app/audit.py` | ~26 | Hash-chain reducer and verifier |
-| `app/users.py` | ~101 | Accounts, roles, cookie sessions, verification |
+| `app/users.py` | ~75 | Accounts, roles, cookie sessions |
 | `app/email_channel.py`, `app/jira_channel.py`, `app/adapters.py` | ~140 | Inbound polling, outbound replies, integration seam |
 
 ## 2. The state object
@@ -96,7 +96,7 @@ Casing trap worth knowing: the deterministic path lower-cases every classificati
 - **Auto-tagging.** After every run, tags are derived from the classification, at the shared layer, so both pipelines get it.
 - **Human request override.** A message asking for a person parks the ticket for review with no model call at all.
 - **Channel dispatch.** A reply leaves through the channel the ticket arrived on: email over SMTP, Jira as a comment, otherwise in-app only.
-- **Verification gate.** Every endpoint depends on an active, verified account; customers additionally may only touch tickets born from their own address.
+- **Session gate.** Every endpoint depends on an active account; customers additionally may only touch tickets born from their own address. Email verification was removed on 2026-07-29 (ADR-014), so the address on an account is asserted rather than proved.
 
 ## 7. Error handling summary
 
@@ -106,4 +106,3 @@ Casing trap worth knowing: the deterministic path lower-cases every classificati
 | Model call times out | Second attempt, then ticket marked `error` |
 | Knowledge base unreachable | Retrieval raises, the run fails and retries; a reviewer signing off is never blocked by it |
 | Email or Jira send fails | Recorded in the response as a delivery string; the reply still stands in the thread |
-| Verification email fails | Logged, signup still succeeds, the user can request a fresh link |

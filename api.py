@@ -42,11 +42,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(
-    fastapi_users.get_auth_router(auth_backend, requires_verification=True), prefix="/auth", tags=["auth"]
-)
+app.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth", tags=["auth"])
 app.include_router(fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"])
-app.include_router(fastapi_users.get_verify_router(UserRead), prefix="/auth", tags=["auth"])
 app.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix="/users", tags=["users"])
 
 
@@ -80,7 +77,6 @@ def health():
 
 @app.post("/tickets")
 def create_ticket(payload: TicketIn, background: BackgroundTasks, user: User = Depends(current_user)):
-    _require_verified(user)
     ticket_id = f"T-{uuid.uuid4().hex[:8]}"
     if user.role == "customer":
         payload.email = user.email  # identity comes from the account, never the form
@@ -232,15 +228,8 @@ def _reprocess(ticket_id: str, latest: str):
             _auto_dispatch(ticket_id)
 
 
-def _require_verified(user: User) -> None:
-    # an unverified customer account must not claim the tickets of an email it never proved owning
-    if user.role == "customer" and not user.is_verified:
-        raise HTTPException(status_code=403, detail="verify your email first")
-
-
 def _require_ticket_access(ticket_id: str, user: User) -> dict:
     # staff see everything; a customer only touches tickets born from their email
-    _require_verified(user)
     state = store.get(ticket_id)
     if state is None:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -259,7 +248,6 @@ def _require_open(state: dict) -> None:
 def my_tickets(user: User = Depends(current_user)):
     if user.role != "customer":
         raise HTTPException(status_code=403, detail="customer view")
-    _require_verified(user)
     return store.list_by_email(user.email)
 
 
