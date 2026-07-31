@@ -34,9 +34,12 @@ active_graph = graph_auto if AGENT_MODE == "autonomous" else graph
 
 app = FastAPI(title="Support Ticket Triage API")
 
+# comma-separated list, e.g. "https://demo.example.com,http://localhost:3000"
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

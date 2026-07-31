@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "./api";
+import { api, API_BASE } from "./api";
 
 export type User = {
   id: string;
@@ -21,7 +21,7 @@ export function useUser() {
 }
 
 export async function login(email: string, password: string) {
-  const res = await fetch("http://localhost:8000/auth/login", {
+  const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
