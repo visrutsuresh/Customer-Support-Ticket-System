@@ -5,12 +5,12 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app import jira_channel, store
+from app import jira_channel, ratelimit, store
 from app.agents import learn_agent
 from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
@@ -44,6 +44,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# register/login live in the fastapi-users router, so the limit sits in middleware
+_AUTH_LIMITS = {"/auth/register": (5, 3600), "/auth/login": (10, 300)}
+
+
+@app.middleware("http")
+async def _auth_rate_limit(request: Request, call_next):
+    limit = _AUTH_LIMITS.get(request.url.path) if request.method == "POST" else None
+    if limit:
+        try:
+            ratelimit.check(f"{request.url.path}:{ratelimit.client_ip(request)}", *limit)
+        except HTTPException as e:
+            return JSONResponse({"detail": e.detail}, status_code=e.status_code)
+    return await call_next(request)
+
 
 app.include_router(fastapi_users.get_auth_router(auth_backend), prefix="/auth", tags=["auth"])
 app.include_router(fastapi_users.get_register_router(UserRead, UserCreate), prefix="/auth", tags=["auth"])
@@ -80,6 +95,7 @@ def health():
 
 @app.post("/tickets")
 def create_ticket(payload: TicketIn, background: BackgroundTasks, user: User = Depends(current_user)):
+    ratelimit.check(f"tickets:{user.email}", 10, 600)  # each ticket fires paid LLM calls
     ticket_id = f"T-{uuid.uuid4().hex[:8]}"
     if user.role == "customer":
         payload.email = user.email  # identity comes from the account, never the form
@@ -393,6 +409,7 @@ class ReplyIn(BaseModel):
 
 @app.post("/tickets/{ticket_id}/reply")
 def customer_reply(ticket_id: str, payload: ReplyIn, background: BackgroundTasks, user: User = Depends(current_user)):
+    ratelimit.check(f"reply:{user.email}", 20, 600)  # replies re-run the pipeline
     state = _require_ticket_access(ticket_id, user)
     _require_open(state)
     store.append_message(ticket_id, "customer", payload.body)  # message thread grows & lifecycle -> open
@@ -455,6 +472,7 @@ class ResolveIn(BaseModel):
 
 @app.post("/tickets/{ticket_id}/resolve")
 def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User = Depends(current_user)):
+    ratelimit.check(f"resolve:{user.email}", 30, 600)  # resolve triggers the learn agent
     state = _require_ticket_access(ticket_id, user)
     csat = payload.csat if payload else None
     if csat is not None:
