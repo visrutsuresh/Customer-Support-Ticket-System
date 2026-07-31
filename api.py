@@ -5,7 +5,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
@@ -81,11 +81,12 @@ def brand_config():
 
 
 class TicketIn(BaseModel):
-    subject: str
-    body: str
-    source: str = "form"
-    name: str | None = None
-    email: str | None = None
+    # caps stop a pasted megabyte from reaching the DB and the paid LLM prompt
+    subject: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=20_000)
+    source: str = Field(default="form", max_length=40)
+    name: str | None = Field(default=None, max_length=120)
+    email: str | None = Field(default=None, max_length=254)
 
 
 @app.get("/")
@@ -277,13 +278,15 @@ def list_tickets(
     tag: str | None = None,
     q: str | None = None,
     scope: str = "live",
+    limit: int = Query(default=200, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(require_staff),
 ):
     # least-privilege: the live queue is for all staff, raw archive browsing is admin-only.
     # staff reach a customer's past tickets through the history panel on a live ticket instead.
     if scope != "live" and user.role != "admin":
         raise HTTPException(status_code=403, detail="archive browsing is admin only")
-    return store.list_all(status=status, category=category, tag=tag, q=q, scope=scope)
+    return store.list_all(status=status, category=category, tag=tag, q=q, scope=scope, limit=limit, offset=offset)
 
 
 @app.get("/tickets/{ticket_id}")
@@ -330,7 +333,7 @@ def customer_reopen(ticket_id: str, user: User = Depends(current_user)):
 
 
 class EditIn(BaseModel):
-    reply: str
+    reply: str = Field(min_length=1, max_length=20_000)
 
 
 def dispatch_reply(state: dict, reply: str, ticket_id: str) -> str:
@@ -404,7 +407,7 @@ def get_metrics(user: User = Depends(require_staff)):
 
 
 class ReplyIn(BaseModel):
-    body: str
+    body: str = Field(min_length=1, max_length=20_000)
 
 
 @app.post("/tickets/{ticket_id}/reply")
@@ -515,7 +518,7 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
 
 
 class TagIn(BaseModel):
-    tag: str
+    tag: str = Field(min_length=1, max_length=60)
 
 
 @app.post("/tickets/{ticket_id}/tags")
@@ -539,7 +542,7 @@ def remove_ticket_tag(ticket_id: str, tag: str, user: User = Depends(require_sta
 
 
 class NoteIn(BaseModel):
-    body: str
+    body: str = Field(min_length=1, max_length=20_000)
 
 
 @app.post("/tickets/{ticket_id}/note")
@@ -560,9 +563,9 @@ def customer_thread(ticket_id: str, user: User = Depends(current_user)):
 
 
 class TemplateIn(BaseModel):
-    name: str
-    body: str
-    category: str | None = None
+    name: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=20_000)
+    category: str | None = Field(default=None, max_length=60)
     keywords: list[str] = []
     auto_use: bool = False
 

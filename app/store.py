@@ -219,7 +219,7 @@ def list_by_email(email: str) -> list[dict]:
         cur.execute(
             """SELECT ticket_id, subject, human_status, lifecycle, created_at
                FROM tickets WHERE lower(customer_email) = lower(%s) AND merged_into IS NULL
-               ORDER BY created_at DESC""",
+               ORDER BY created_at DESC LIMIT 200""",
             (email,),
         )
         rows = cur.fetchall()
@@ -231,7 +231,7 @@ def list_by_email(email: str) -> list[dict]:
     return [r for r in rows if winner[r["ticket_id"].split("-", 1)[-1]] == r["ticket_id"]]
 
 
-def list_all(status=None, category=None, tag=None, q=None, scope="live") -> list[dict]:
+def list_all(status=None, category=None, tag=None, q=None, scope="live", limit=200, offset=0) -> list[dict]:
     clauses, params = ["merged_into IS NULL"], []
     if scope == "live":
         clauses.append("ticket_id NOT LIKE %s")
@@ -260,8 +260,8 @@ def list_all(status=None, category=None, tag=None, q=None, scope="live") -> list
                               assignee, human_status,lifecycle, tags, created_at, due_at, (due_at IS NOT NULL AND due_at <now() AND lifecycle <> 'resolved') AS sla_breached,
                               state -> 'ticket' ->> 'source' AS source,
                               left(state -> 'ticket' ->> 'body', 90) AS preview
-                       FROM tickets {where} ORDER BY created_at DESC""",
-            params,
+                       FROM tickets {where} ORDER BY created_at DESC LIMIT %s OFFSET %s""",
+            params + [limit, offset],
         )
         return cur.fetchall()
 
