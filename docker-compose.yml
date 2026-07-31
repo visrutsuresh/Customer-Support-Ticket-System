@@ -1,14 +1,28 @@
-# Local Weaviate (vector database) for the #1 Customer Support app.
-# Runs entirely on your machine via Docker. No cloud account, no API key.
-# Start:  docker compose up -d      Stop:  docker compose down
+# Local stack for the #1 Customer Support app: Postgres + Weaviate + the API.
+# Start everything:  docker compose up -d --build
+# DBs only (run the API with uvicorn yourself):  docker compose up -d postgres weaviate
 name: customer-support-ticket-system
 services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      # inside the compose network the DBs answer to their service names, not localhost
+      DATABASE_URL: postgresql://support:support@postgres:5432/tickets
+      WEAVIATE_HOST: weaviate
+    depends_on:
+      - postgres
+      - weaviate
+    restart: unless-stopped
+
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.38.2
     ports:
       - "8080:8080"      # REST API (what we talk to from Python)
       - "50051:50051"    # gRPC API (faster channel the client also uses)
-    restart: on-failure:0
+    restart: unless-stopped
     environment:
       CLUSTER_HOSTNAME: 'node1'
       CLUSTER_ADVERTISE_ADDR: '127.0.0.1'
@@ -24,7 +38,7 @@ services:
     image: postgres:17
     ports:
       - "5432:5432"
-    restart: on-failure:0
+    restart: unless-stopped
     environment:
       POSTGRES_USER: support
       POSTGRES_PASSWORD: support

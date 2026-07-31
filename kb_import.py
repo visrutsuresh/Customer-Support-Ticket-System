@@ -11,9 +11,8 @@ import json
 import os
 import re
 
-import weaviate
-
 from app.embed import embed
+from app.kb import connect
 
 N_ARTICLES, N_TICKETS = 250, 150
 SEED_FILE = "data/kb_seed.jsonl"
@@ -70,7 +69,7 @@ def load_rows() -> list[dict]:
 
 rows = load_rows()
 
-client = weaviate.connect_to_local()
+client = connect()
 try:
     kb = client.collections.get("Knowledge")
     with kb.batch.dynamic() as batch:

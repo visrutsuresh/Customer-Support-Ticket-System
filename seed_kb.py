@@ -1,10 +1,10 @@
-import weaviate
 from weaviate.classes.config import Configure, DataType, Property
 
 import seed_data
 from app.embed import embed
+from app.kb import connect
 
-client = weaviate.connect_to_local()
+client = connect()
 
 if client.collections.exists("Knowledge"):
     client.collections.delete("Knowledge")
