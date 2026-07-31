@@ -76,17 +76,23 @@ export default function Queue() {
     if (scope !== "live") params.set("scope", scope);
     const load = () =>
       api(`/tickets?${params}`)
-        .then(setTickets)
+        .then((data) => {
+          setTickets(data);
+          setError(""); // a good poll heals a bad one, the banner must not stick
+        })
         .catch((e) => setError(String(e)));
     load();
     const i = setInterval(load, 4000);
     return () => clearInterval(i);
   }, [q, status, category, scope]);
 
-  if (error) return <main className="p-8 text-[var(--rust)]">{error}</main>;
-
   return (
     <main className="max-w-5xl px-10 py-9">
+      {error && (
+        <p className="mb-3 font-array text-[11px] text-[var(--rust)]">
+          CONNECTION TROUBLE · retrying, showing the last known queue
+        </p>
+      )}
       <div
         className="flex items-baseline gap-4 rise"
         style={{ "--i": 0 } as React.CSSProperties}
@@ -155,6 +161,10 @@ export default function Queue() {
 
       {!tickets ? (
         <p className="p-4 text-[var(--mut)]">Loading the queue…</p>
+      ) : tickets.length === 0 ? (
+        <p className="p-4 text-[var(--mut)]">
+          No tickets match. Clear the search or filters to see the full queue.
+        </p>
       ) : (
         <ul>
           {tickets.map((t, idx) => {

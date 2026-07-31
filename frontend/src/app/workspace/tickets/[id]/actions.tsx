@@ -12,6 +12,8 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [applied, setApplied] = useState("");
   const [macroError, setMacroError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [actError, setActError] = useState("");
 
   useEffect(() => {
     // staff-only endpoint, and this strip only ever renders for staff
@@ -35,23 +37,36 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
   }
 
   async function act(kind: string) {
-    let out = null;
+    if (busy) return; // a double-click must not double-send the customer an email
+    setBusy(true);
+    setActError("");
     try {
-      out = await api(`/tickets/${id}/${kind}`, { method: "POST" });
-    } catch {
-      // resolve renames the id and the page can redirect mid-flight; land on the queue either way
-    }
-    if (out?.delivery) {
-      setDelivery(`Delivered: ${out.delivery}`); // show how it left the building before we bounce
-      setTimeout(() => router.push("/workspace"), 1200);
-    } else {
-      router.push("/workspace");
+      const out = await api(`/tickets/${id}/${kind}`, { method: "POST" });
+      if (out?.delivery) {
+        setDelivery(`Delivered: ${out.delivery}`); // show how it left the building before we bounce
+        setTimeout(() => router.push("/workspace"), 1200);
+      } else {
+        router.push("/workspace");
+      }
+    } catch (e) {
+      // if resolve renamed the id mid-flight the page redirect unmounts us anyway;
+      // a real failure stays on screen instead of silently bouncing to the queue
+      setActError(`That did not go through: ${e}`);
+      setBusy(false);
     }
   }
 
   async function saveEdit() {
-    await api(`/tickets/${id}/edit`, { method: "POST", body: JSON.stringify({ reply: text }) });
-    router.push("/workspace");
+    if (busy) return;
+    setBusy(true);
+    setActError("");
+    try {
+      await api(`/tickets/${id}/edit`, { method: "POST", body: JSON.stringify({ reply: text }) });
+      router.push("/workspace");
+    } catch (e) {
+      setActError(`Save failed: ${e}`);
+      setBusy(false);
+    }
   }
 
   return (
@@ -85,23 +100,25 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
         className="input-box h-40 text-[13.5px] leading-relaxed"
       ></textarea>
       <div className="flex gap-2 mt-3">
-        <button onClick={() => act("approve")} className="btn">
-          Approve &amp; send
+        <button onClick={() => act("approve")} disabled={busy} className="btn disabled:opacity-50">
+          {busy ? "Working…" : "Approve & send"}
         </button>
-        <button onClick={saveEdit} className="btn btn-outline">
+        <button onClick={saveEdit} disabled={busy} className="btn btn-outline disabled:opacity-50">
           Save edit
         </button>
         <button
           onClick={() => act("reject")}
-          className="text-[var(--rust)] font-semibold text-[13px] px-3 py-2.5 hover:underline underline-offset-4"
+          disabled={busy}
+          className="text-[var(--rust)] font-semibold text-[13px] px-3 py-2.5 hover:underline underline-offset-4 disabled:opacity-50"
         >
           Reject
         </button>
-        <button onClick={() => act("resolve")} className="btn btn-olive ml-auto">
+        <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive ml-auto disabled:opacity-50">
           Mark resolved
         </button>
       </div>
       {delivery && <p className="font-array text-[11px] text-[var(--olive)] mt-3">{delivery.toUpperCase()}</p>}
+      {actError && <p className="font-array text-[11px] text-[var(--rust)] mt-3">{actError.toUpperCase()}</p>}
     </div>
   );
 }

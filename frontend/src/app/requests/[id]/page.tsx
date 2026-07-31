@@ -17,6 +17,8 @@ export default function RequestThread() {
   const [rating, setRating] = useState(false);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
   const load = useCallback(() => {
     api(`/tickets/${id}/thread`)
@@ -50,15 +52,31 @@ export default function RequestThread() {
   }, [load]);
 
   async function sendReply() {
-    if (!reply.trim()) return;
-    await api(`/tickets/${id}/reply`, { method: "POST", body: JSON.stringify({ body: reply }) });
-    setReply("");
-    load();
+    if (!reply.trim() || sending) return;
+    setSending(true);
+    setSendError("");
+    try {
+      await api(`/tickets/${id}/reply`, { method: "POST", body: JSON.stringify({ body: reply }) });
+      setReply("");
+      load();
+    } catch (e) {
+      setSendError(`Your reply did not send: ${e}`);
+    } finally {
+      setSending(false);
+    }
   }
 
   async function reopenRequest() {
-    const out = await api(`/my/tickets/${id}/reopen`, { method: "POST" });
-    router.replace(`/requests/${out.ticket_id}`);
+    if (sending) return;
+    setSending(true);
+    setSendError("");
+    try {
+      const out = await api(`/my/tickets/${id}/reopen`, { method: "POST" });
+      router.replace(`/requests/${out.ticket_id}`);
+    } catch (e) {
+      setSendError(`Could not reopen this request: ${e}`);
+      setSending(false);
+    }
   }
 
   async function resolve(csat: number) {
@@ -119,13 +137,16 @@ export default function RequestThread() {
                 placeholder="Write a reply"
                 className="input flex-1 text-[14px]"
               />
-              <button onClick={sendReply} className="btn">
-                Send
+              <button onClick={sendReply} disabled={sending} className="btn disabled:opacity-50">
+                {sending ? "Sending…" : "Send"}
               </button>
               <button onClick={() => setRating(true)} className="btn btn-olive">
                 Resolve
               </button>
             </div>
+          )}
+          {sendError && (
+            <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">{sendError.toUpperCase()}</p>
           )}
 
           {rating && (
