@@ -69,6 +69,9 @@ app.include_router(fastapi_users.get_users_router(UserRead, UserUpdate), prefix=
 async def _startup():
     store.init_db()  # tables exist when the API BOOTS, not when the module imports (tests need import without a DB)
     await create_user_table()
+    stale = store.sweep_stale_processing()
+    if stale:
+        print(f"startup sweep: {len(stale)} ticket(s) orphaned mid-pipeline by a restart, marked error: {stale}")
 
 
 @app.get("/config")

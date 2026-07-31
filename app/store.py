@@ -179,6 +179,16 @@ def save(state: dict) -> None:
         )
 
 
+def sweep_stale_processing() -> list[str]:
+    """Boot-time repair: the app runs one worker, so any ticket still 'processing'
+    at startup was orphaned by a restart mid-pipeline and would spin forever."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE tickets SET human_status = 'error' WHERE human_status = 'processing' RETURNING ticket_id"
+        )
+        return [r[0] for r in cur.fetchall()]
+
+
 def save_pending(ticket_id, subject, body, source, name, email, created_at) -> None:
     # store a ticket as "processing" BEFORE the pipeline runs, so the customer's submit is instant
     minimal = {
