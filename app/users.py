@@ -15,8 +15,22 @@ SECRET = os.getenv("AUTH_SECRET", "")
 if not SECRET:
     raise RuntimeError("AUTH_SECRET missing from .env")
 
-# reuse the app's DATABASE_URL but through the async driver fastapi-users needs
-ASYNC_DB_URL = os.environ["DATABASE_URL"].replace("postgresql://", "postgresql+asyncpg://")
+# reuse the app's DATABASE_URL but through the async driver fastapi-users needs.
+# asyncpg does not understand libpq's sslmode/channel_binding params (Neon URLs
+# carry both) and crashes on them; translate to the one param it does speak.
+def _to_asyncpg_url(url: str) -> str:
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(url.replace("postgresql://", "postgresql+asyncpg://"))
+    params = dict(parse_qsl(parts.query))
+    needs_ssl = params.pop("sslmode", "") not in ("", "disable")
+    params.pop("channel_binding", None)
+    if needs_ssl:
+        params["ssl"] = "require"
+    return urlunsplit(parts._replace(query=urlencode(params)))
+
+
+ASYNC_DB_URL = _to_asyncpg_url(os.environ["DATABASE_URL"])
 
 
 class Base(DeclarativeBase):
