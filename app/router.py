@@ -19,7 +19,8 @@ def _modal(url: str, prompt: str, max_new_tokens: int) -> str:
     resp = requests.post(
         url,
         json={"prompt": prompt, "token": LANE_TOKEN, "max_new_tokens": max_new_tokens},
-        timeout=90,
+        # a cold Modal container spends ~77s loading before it can answer; 90s left no headroom
+        timeout=int(os.getenv("LANE_TIMEOUT_S", "300")),
     )
     resp.raise_for_status()
     return resp.json()["text"]

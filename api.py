@@ -134,7 +134,9 @@ def _ack_escalation(ticket_id: str) -> None:
     store.append_message(ticket_id, "agent", ESCALATION_ACK)
 
 
-PIPELINE_TIMEOUT_S = 180  # same wall-clock cap bench.py uses
+# default matches bench.py's cap; deployed autonomous mode needs more: cold lane
+# load (~77s) + a 60-140s five-agent run does not fit inside 180
+PIPELINE_TIMEOUT_S = int(os.getenv("PIPELINE_TIMEOUT_S", "180"))
 
 _CANCELLED: set[str] = set()  # resolve marks a ticket doomed; in-flight runs check here before working
 
