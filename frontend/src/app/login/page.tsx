@@ -2,11 +2,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { EyeIcon } from "@/lib/icons";
 import { login, register } from "@/lib/useUser";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -55,14 +57,24 @@ export default function LoginPage() {
           className="input mb-5"
         />
         <label className="field">Password</label>
-        <input
-          type="password"
-          required
-          minLength={8}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="input mb-6"
-        />
+        <div className="relative mb-6">
+          <input
+            type={showPw ? "text" : "password"}
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input w-full pr-9"
+          />
+          <button
+            type="button"
+            aria-label={showPw ? "Hide password" : "Show password"}
+            onClick={() => setShowPw(!showPw)}
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--mut)] hover:text-[var(--ink)]"
+          >
+            <EyeIcon off={showPw} />
+          </button>
+        </div>
 
         {error && <p className="text-sm text-[var(--rust)] mb-4">{error}</p>}
 
