@@ -26,7 +26,18 @@ export default function PortalShell({ children }: { children: (user: User) => Re
   }
 
   if (loading || !user || user.role !== "customer") {
-    return <main className="min-h-[100dvh] bg-[var(--paper)]" />;
+    // never a silent blank page: the free-tier backend can take up to a minute
+    // to wake from sleep, and this is what the visitor stares at meanwhile
+    return (
+      <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
+        <div className="text-center">
+          <span className="inline-block w-9 h-9 bg-[var(--ox)] text-[var(--paper)] leading-9 text-lg rounded-[3px] animate-pulse">雲</span>
+          <p className="font-array text-[10.5px] tracking-[0.2em] text-[var(--mut)] mt-3">
+            WAKING THE SERVICE UP · THIS CAN TAKE A MINUTE
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (

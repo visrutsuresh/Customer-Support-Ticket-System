@@ -48,7 +48,13 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   }
 
   if (loading || !user || user.role === "customer") {
-    return <main className="min-h-[100dvh] bg-[var(--paper)]" />;
+    return (
+      <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
+        <p className="font-array text-[10.5px] tracking-[0.2em] text-[var(--mut)] animate-pulse">
+          WAKING THE SERVICE UP · THIS CAN TAKE A MINUTE
+        </p>
+      </main>
+    );
   }
 
   const navItem = (href: string, label: string, active: boolean) => (
