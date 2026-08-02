@@ -64,13 +64,22 @@ export default function Queue() {
   const [tickets, setTickets] = useState<Ticket[] | null>(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
+  const [qInput, setQInput] = useState("");
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
   const [scope, setScope] = useState("live");
+  const [sort, setSort] = useState("newest");
+
+  // debounce: one request when typing pauses, not one per keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
 
   useEffect(() => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (sort !== "newest") params.set("sort", sort);
     if (status) params.set("status", status);
     if (category) params.set("category", category);
     if (scope !== "live") params.set("scope", scope);
@@ -84,7 +93,7 @@ export default function Queue() {
     load();
     const i = setInterval(load, 4000);
     return () => clearInterval(i);
-  }, [q, status, category, scope]);
+  }, [q, status, category, scope, sort]);
 
   return (
     <main className="max-w-5xl px-10 py-9">
@@ -125,11 +134,20 @@ export default function Queue() {
         style={{ "--i": 1 } as React.CSSProperties}
       >
         <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          value={qInput}
+          onChange={(e) => setQInput(e.target.value)}
           placeholder="Search the registry"
           className="flex-1 bg-transparent outline-none py-3 text-[13.5px] placeholder:text-[var(--mut)]"
         />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="font-array text-[11px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
+        >
+          <option value="newest">NEWEST</option>
+          <option value="oldest">OLDEST</option>
+          <option value="sla">SLA URGENCY</option>
+        </select>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
@@ -160,7 +178,16 @@ export default function Queue() {
       </div>
 
       {!tickets ? (
-        <p className="p-4 text-[var(--mut)]">Loading the queue…</p>
+        <div aria-hidden className="divide-y divide-[var(--line)]">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse flex items-center gap-4 py-4">
+              <span className="h-3 w-10 rounded bg-[var(--line)]" />
+              <span className="h-3 flex-1 max-w-md rounded bg-[var(--line)]" />
+              <span className="h-3 w-24 rounded bg-[var(--line)]" />
+              <span className="h-3 w-16 rounded bg-[var(--line)]" />
+            </div>
+          ))}
+        </div>
       ) : tickets.length === 0 ? (
         <p className="p-4 text-[var(--mut)]">
           No tickets match. Clear the search or filters to see the full queue.
@@ -189,6 +216,11 @@ export default function Queue() {
                   <span>
                     <span className="block font-semibold text-[15.5px]">
                       {t.subject}
+                      {t.created_at && Date.now() - new Date(t.created_at).getTime() < 60_000 && (
+                        <span className="ml-2 align-middle font-array text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--olive)] text-white">
+                          NEW
+                        </span>
+                      )}
                     </span>
                     {t.preview && (
                       <span className="block text-[12.5px] text-[var(--mut)] mt-0.5">

@@ -36,8 +36,14 @@ uv run --with pytest --with httpx python -m pytest tests/ -q
 | `test_reopen_refuses_non_archived` | Reopening a live ticket is 409 |
 | `test_customer_cannot_reopen_someone_elses_ticket` | Ownership is enforced on reopen |
 | `test_customer_history_needs_a_real_ticket` | The history panel refuses an unknown ticket |
+| `test_window_blocks_then_recovers` | The rate limiter refuses the call over the cap with 429, then allows again once the window has passed |
+| `test_keys_are_independent` | One account's spent rate budget never affects another's |
+| `test_assign_and_clear` | Manual assignment sets a trimmed assignee and null clears it back to unassigned |
+| `test_assign_missing_ticket_404s` | Assigning on an unknown ticket refuses with 404 |
+| `test_unknown_sort_rejected` | A sort key outside the whitelist is refused with 422 and never reaches SQL |
+| `test_sla_sort_reaches_store_as_the_whitelisted_key` | The `sla` sort arrives at the store as the whitelisted key, not as user text |
 
-**Last run: 2026-07-29, 9 passed, 0 failed, 2.0 seconds.**
+**Last run: 2026-08-02, 15 passed, 0 failed, 0.7 seconds.**
 
 ## 4. The auth probe, and why it no longer applies
 

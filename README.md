@@ -30,6 +30,12 @@ Install these once:
 - **A `.env` file** in the repo root (see below). It is gitignored and never committed.
 
 > The open-model lanes (3B/14B) run on Modal as web endpoints, deployed separately from `modal_lane/llm_service.py`.
+>
+> **No lane yet? Deploy your own in ~10 minutes** (one-time, from any machine where `pip install modal` works):
+> 1. `modal setup` (free account, $30/month free credit). Set a spend cap in the Modal dashboard before anything else.
+> 2. Pick a random token and store it as a Modal secret the service reads: `modal secret create llm-lane-token LANE_TOKEN=<your-token>`
+> 3. `modal deploy modal_lane/llm_service.py`. The deploy prints the endpoint URLs for both lanes.
+> 4. Put the URLs and your token into `.env` as `PRIVATE_LANE_URL`, `REVIEW_LANE_URL` and `PRIVATE_LANE_TOKEN`. The services scale to zero when idle, so a demo costs cents.
 > You only need the endpoint **URLs + token** in your `.env`; you do not install Modal to run the app.
 
 ### `.env` (copy from `.env.example` and fill in)

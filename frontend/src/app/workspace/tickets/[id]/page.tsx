@@ -197,7 +197,7 @@ export default function TicketDetail() {
               </button>
             </div>
           ) : (
-            <Actions id={id} reply={s.draft.reply ?? ""} />
+            <Actions id={id} reply={s.draft.reply ?? ""} currentAssignee={s.decision.assignee?.name ?? ""} />
           )}
           <div className="border-t border-[var(--line)] mt-6 pt-4">
             <span className="font-array text-[10.5px] text-[var(--mut)]">TAGS</span>

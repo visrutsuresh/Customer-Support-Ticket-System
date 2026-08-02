@@ -19,7 +19,8 @@ Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (s
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/` | Health, plus which pipeline mode and model tier are active |
+| GET | `/` | Health, plus which pipeline mode and model tier are active. Instant and dependency-free, for uptime pings |
+| GET | `/healthz` | The honest health check: probes Postgres and Weaviate and reports each, `status` is `ok` only if both answer |
 | GET | `/config` | Brand name and tagline for the portal |
 
 ## 3. Tickets
@@ -28,7 +29,8 @@ Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (s
 |---|---|---|---|
 | POST | `/tickets` | any signed-in account | Returns immediately with `{ticket_id, status: "processing"}`; the pipeline runs in the background. A customer's identity always overrides any address in the payload |
 | GET | `/my/tickets` | customer | The caller's own tickets |
-| GET | `/tickets` | staff | The queue. Filters: `status`, `category`, `tag`, `q` (free text), `scope` (`live` for everyone, anything else is admin only, 403 otherwise) |
+| GET | `/tickets` | staff | The queue. Filters: `status`, `category`, `tag`, `q` (free text), `scope` (`live` for everyone, anything else is admin only, 403 otherwise). Sorting: `sort` = `newest` (default), `oldest` or `sla` (most urgent deadline first); anything else is 422. Pagination: `limit` (default and cap 200) and `offset` |
+| POST | `/tickets/{id}/assign` | staff | Manual assignment: `{"assignee": "dana"}` sets it, `{"assignee": null}` clears it back to unassigned. Free text on purpose, the pipeline writes short names into the same column. 404 on a missing ticket, 409 if the ticket is resolved |
 | GET | `/tickets/{id}` | staff | The full stored state |
 | GET | `/tickets/{id}/history` | staff | That customer's other tickets, unlocked by having this one open |
 | GET | `/tickets/{id}/thread` | owner or staff | The customer-safe message list, internal notes stripped |

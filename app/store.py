@@ -57,8 +57,21 @@ DEFAULT_TEMPLATES = [
 ]
 
 
+_pool = None
+
+
 def _connect():
-    return psycopg.connect(DATABASE_URL)
+    # one shared pool instead of a fresh TCP+TLS handshake per query: the classic
+    # works-alone, falls-over-under-concurrency fix. Lazy so plain imports (tests,
+    # seed scripts) never open sockets.
+    global _pool
+    if _pool is None:
+        from psycopg_pool import ConnectionPool
+
+        # timeout: a checkout against a dead database fails in seconds, so the
+        # health check reports "down" instead of hanging the caller
+        _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=10, open=True, timeout=5)
+    return _pool.connection()
 
 
 def _seed_templates(conn):
@@ -160,7 +173,10 @@ def save(state: dict) -> None:
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                ON CONFLICT (ticket_id) DO UPDATE SET
                  subject=EXCLUDED.subject, category=EXCLUDED.category, priority=EXCLUDED.priority,
-                 action=EXCLUDED.action, assignee=EXCLUDED.assignee,
+                 action=EXCLUDED.action,
+                 -- a human's manual assignment outranks the pipeline's suggestion:
+                 -- once the column holds a name, a late-finishing run must not wipe it
+                 assignee=COALESCE(tickets.assignee, EXCLUDED.assignee),
                  human_status=EXCLUDED.human_status, created_at=EXCLUDED.created_at,due_at=EXCLUDED.due_at,
                  state=EXCLUDED.state, customer_email=EXCLUDED.customer_email""",
             (
@@ -241,7 +257,21 @@ def list_by_email(email: str) -> list[dict]:
     return [r for r in rows if winner[r["ticket_id"].split("-", 1)[-1]] == r["ticket_id"]]
 
 
-def list_all(status=None, category=None, tag=None, q=None, scope="live", limit=200, offset=0) -> list[dict]:
+def set_assignee(ticket_id: str, assignee: str | None) -> bool:
+    with _connect() as conn:
+        cur = conn.execute("UPDATE tickets SET assignee = %s WHERE ticket_id = %s", (assignee, ticket_id))
+        return cur.rowcount > 0
+
+
+# whitelisted ORDER BY fragments; the sort key never touches SQL as user text
+SORTS = {
+    "newest": "created_at DESC",
+    "oldest": "created_at ASC",
+    "sla": "(due_at IS NULL) ASC, due_at ASC, created_at DESC",  # most urgent deadline first, undated last
+}
+
+
+def list_all(status=None, category=None, tag=None, q=None, scope="live", limit=200, offset=0, sort="newest") -> list[dict]:
     clauses, params = ["merged_into IS NULL"], []
     if scope == "live":
         clauses.append("ticket_id NOT LIKE %s")
@@ -270,7 +300,7 @@ def list_all(status=None, category=None, tag=None, q=None, scope="live", limit=2
                               assignee, human_status,lifecycle, tags, created_at, due_at, (due_at IS NOT NULL AND due_at <now() AND lifecycle <> 'resolved') AS sla_breached,
                               state -> 'ticket' ->> 'source' AS source,
                               left(state -> 'ticket' ->> 'body', 90) AS preview
-                       FROM tickets {where} ORDER BY created_at DESC LIMIT %s OFFSET %s""",
+                       FROM tickets {where} ORDER BY {SORTS.get(sort, SORTS["newest"])} LIMIT %s OFFSET %s""",
             params + [limit, offset],
         )
         return cur.fetchall()

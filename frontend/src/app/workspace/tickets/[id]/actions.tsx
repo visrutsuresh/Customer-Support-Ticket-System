@@ -2,10 +2,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useUser } from "@/lib/useUser";
 
 type Template = { id: number; name: string; category: string | null };
 
-export default function Actions({ id, reply }: { id: string; reply: string }) {
+export default function Actions({
+  id,
+  reply,
+  currentAssignee = "",
+}: {
+  id: string;
+  reply: string;
+  currentAssignee?: string;
+}) {
   const router = useRouter();
   const [text, setText] = useState(reply);
   const [delivery, setDelivery] = useState("");
@@ -14,6 +23,23 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
   const [macroError, setMacroError] = useState("");
   const [busy, setBusy] = useState(false);
   const [actError, setActError] = useState("");
+  const { user } = useUser();
+  const [assigned, setAssigned] = useState(currentAssignee); // seeded with the ticket's real assignee
+
+  async function assignToMe() {
+    if (busy || !user) return;
+    setBusy(true);
+    setActError("");
+    try {
+      const me = user.email.split("@")[0]; // matches the short names the AI writes in the column
+      await api(`/tickets/${id}/assign`, { method: "POST", body: JSON.stringify({ assignee: me }) });
+      setAssigned(me);
+    } catch (e) {
+      setActError(`Assign failed: ${e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     // staff-only endpoint, and this strip only ever renders for staff
@@ -113,7 +139,18 @@ export default function Actions({ id, reply }: { id: string; reply: string }) {
         >
           Reject
         </button>
-        <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive ml-auto disabled:opacity-50">
+        <button
+          onClick={assignToMe}
+          disabled={busy || (!!assigned && assigned === (user?.email.split("@")[0] ?? ""))}
+          className="btn btn-outline ml-auto disabled:opacity-50"
+        >
+          {assigned
+            ? assigned === (user?.email.split("@")[0] ?? "")
+              ? `Assigned: ${assigned.toUpperCase()}`
+              : `Take over (now: ${assigned.toUpperCase()})`
+            : "Assign to me"}
+        </button>
+        <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive disabled:opacity-50">
           Mark resolved
         </button>
       </div>

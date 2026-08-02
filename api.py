@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app import jira_channel, ratelimit, store
+from app import jira_channel, kb, ratelimit, store
 from app.agents import learn_agent
 from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
@@ -95,6 +95,28 @@ class TicketIn(BaseModel):
 @app.get("/")
 def health():
     return {"status": "ok", "mode": AGENT_MODE, "model_tier": MODEL_TIER}
+
+
+@app.get("/healthz")
+def healthz():
+    # the honest health check: touches each dependency instead of just answering.
+    # /  stays instant for uptime pings; this one is for humans and deploy gates.
+    out = {"api": "ok", "mode": AGENT_MODE, "model_tier": MODEL_TIER}
+    # up/down only, no exception text: this route is unauthenticated and psycopg
+    # errors would leak host/user strings to anyone who asks
+    try:
+        with store._connect() as conn:
+            conn.execute("SELECT 1")
+        out["postgres"] = "ok"
+    except Exception:
+        out["postgres"] = "down"
+    try:
+        kb.connect().close()
+        out["weaviate"] = "ok"
+    except Exception:
+        out["weaviate"] = "down"
+    out["status"] = "ok" if out["postgres"] == "ok" and out["weaviate"] == "ok" else "degraded"
+    return out
 
 
 @app.post("/tickets")
@@ -283,6 +305,7 @@ def list_tickets(
     tag: str | None = None,
     q: str | None = None,
     scope: str = "live",
+    sort: str = "newest",
     limit: int = Query(default=200, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(require_staff),
@@ -291,7 +314,9 @@ def list_tickets(
     # staff reach a customer's past tickets through the history panel on a live ticket instead.
     if scope != "live" and user.role != "admin":
         raise HTTPException(status_code=403, detail="archive browsing is admin only")
-    return store.list_all(status=status, category=category, tag=tag, q=q, scope=scope, limit=limit, offset=offset)
+    if sort not in store.SORTS:
+        raise HTTPException(status_code=422, detail=f"sort must be one of: {', '.join(store.SORTS)}")
+    return store.list_all(status=status, category=category, tag=tag, q=q, scope=scope, limit=limit, offset=offset, sort=sort)
 
 
 @app.get("/tickets/{ticket_id}")
@@ -520,6 +545,23 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
         "csat": csat,
         "jira_done": jira_done,
     }
+
+
+class AssignIn(BaseModel):
+    assignee: str | None = Field(default=None, max_length=120)  # null clears the assignment
+
+
+@app.post("/tickets/{ticket_id}/assign")
+def assign_ticket(ticket_id: str, payload: AssignIn, user: User = Depends(require_staff)):
+    # the most basic helpdesk verb: this ticket is MINE (or nobody's again).
+    # free-text on purpose: the AI writes names here too, no staff table needed.
+    state = store.get(ticket_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    _require_open(state)
+    assignee = (payload.assignee or "").strip() or None
+    store.set_assignee(ticket_id, assignee)
+    return {"ticket_id": ticket_id, "assignee": assignee}
 
 
 class TagIn(BaseModel):
