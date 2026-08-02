@@ -99,7 +99,7 @@ def health():
 
 @app.post("/tickets")
 def create_ticket(payload: TicketIn, background: BackgroundTasks, user: User = Depends(current_user)):
-    ratelimit.check(f"tickets:{user.email}", 10, 600)  # each ticket fires paid LLM calls
+    ratelimit.check(f"tickets:{user.email}", 5, 86_400)  # 5/day per account: autonomous mode burns real GPU money per ticket
     ticket_id = f"T-{uuid.uuid4().hex[:8]}"
     if user.role == "customer":
         payload.email = user.email  # identity comes from the account, never the form
