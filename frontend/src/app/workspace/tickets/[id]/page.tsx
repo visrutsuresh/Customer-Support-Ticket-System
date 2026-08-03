@@ -29,6 +29,14 @@ function initials(name?: string | null, email?: string | null) {
   return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
+// the channel a reply physically leaves through, mirroring api.dispatch_reply
+function returnChannel(source?: string) {
+  if (source === "email") return "email";
+  if (source === "jira") return "Jira";
+  if (source === "zendesk") return "Zendesk";
+  return ""; // form/chat/voice replies stay in-app
+}
+
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -90,8 +98,17 @@ export default function TicketDetail() {
   const conf = s.decision.confidence ?? s.draft.confidence;
   const locked = s.lifecycle === "resolved";
   const escalated = s.decision.action === "escalate";
+  const autoHandled = s.decision.action === "auto_send";
+  const channel = returnChannel(s.ticket.source);
   const messages = s.messages ?? [{ role: "customer", body: s.ticket.body }];
   const custInitials = initials(s.ticket.customer_name, s.ticket.customer_email);
+
+  // the machine's move, told inside the thread where it happened
+  const verdictLine = autoHandled
+    ? "⚡ machine verdict: confident, replied without waiting for a human"
+    : escalated
+      ? `✋ machine verdict: ${s.decision.reason || "not confident"}, drafted a reply and stopped. Nothing has been sent.`
+      : "";
 
   const tagChips = (
     <div className="flex flex-wrap gap-1.5 items-center">
@@ -119,33 +136,58 @@ export default function TicketDetail() {
 
   return (
     <main className="max-w-[1500px]">
-      <div className="px-8 pt-7 pb-4 border-b border-[var(--ink)]">
-        <Link href="/workspace" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)]">
-          ← BACK TO QUEUE
+      {/* ---------- header: who, where from, and the machine's state at a glance ---------- */}
+      <div className="px-8 py-4 border-b border-[var(--ink)] flex items-center gap-3.5 flex-wrap">
+        <Link href="/workspace" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)] shrink-0">
+          ← QUEUE
         </Link>
-        <h1 className="text-[26px] font-bold leading-tight mt-2">{s.ticket.subject}</h1>
-        <div className="font-array text-[11px] text-[var(--mut)] mt-2 flex flex-wrap gap-x-5 gap-y-1">
-          <span>{id.toUpperCase()}</span>
-          <span>
-            SOURCE <b className="text-[var(--ink)] font-semibold">{s.ticket.source?.toUpperCase()}</b>
-          </span>
-          <span>
-            CAT <b className="text-[var(--ink)] font-semibold">{(s.classification.category ?? "—").toUpperCase()}</b>
-          </span>
-          <span>
-            PRI <b className="text-[var(--ink)] font-semibold">{(s.classification.priority ?? "—").toUpperCase()}</b>
-          </span>
-          {s.decision.assignee?.name && <span>ASSIGNED {s.decision.assignee.name.toUpperCase()}</span>}
+        <span className="w-9 h-9 shrink-0 rounded-full grid place-items-center font-array text-[11px] font-bold bg-[var(--line)] text-[var(--ink)]">
+          {custInitials}
+        </span>
+        <div className="min-w-0">
+          <h1 className="text-[19px] font-bold leading-tight truncate">{s.ticket.subject}</h1>
+          <div className="font-array text-[10.5px] text-[var(--mut)] flex flex-wrap gap-x-3">
+            <span>{(s.ticket.customer_name ?? "unknown sender").toUpperCase()}</span>
+            {s.ticket.customer_email && <span>{s.ticket.customer_email.toUpperCase()}</span>}
+            <span>{id.toUpperCase()}</span>
+            <span>
+              CAT <b className="text-[var(--ink)] font-semibold">{(s.classification.category ?? "—").toUpperCase()}</b>
+            </span>
+            <span>
+              PRI <b className="text-[var(--ink)] font-semibold">{(s.classification.priority ?? "—").toUpperCase()}</b>
+            </span>
+          </div>
         </div>
+        <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink)]">
+          {channel ? `✉ ${s.ticket.source.toUpperCase()}` : (s.ticket.source ?? "—").toUpperCase()}
+        </span>
+        {autoHandled && (
+          <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--olive)] text-[var(--paper)]">
+            ⚡ AUTO-HANDLED
+          </span>
+        )}
+        {escalated && (
+          <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--rust)] text-[var(--paper)]">
+            ✋ HELD FOR REVIEW
+          </span>
+        )}
+        {s.decision.assignee?.name && (
+          <span className="font-array text-[10px] text-[var(--mut)] ml-auto">
+            ASSIGNED {s.decision.assignee.name.toUpperCase()}
+          </span>
+        )}
       </div>
 
-      <div className="grid grid-cols-[248px_minmax(0,1.5fr)_minmax(0,1fr)] items-start">
-        {/* ---------- left: who this is ---------- */}
-        <CustomerRail id={id} tags={tagChips} />
+      <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start">
+        {/* ---------- the conversation: one thread, every channel normalised into it ---------- */}
+        <section className="px-7 py-6 min-h-[70vh]">
+          <div className="max-w-[780px] mx-auto flex flex-col gap-4">
+            {channel && (
+              <p className="self-center max-w-[80%] text-center font-array text-[10px] tracking-[0.12em] text-[#6b5a2a] bg-[#f6ecd2] border border-dashed border-[#d9c58a] rounded-[10px] px-4 py-2">
+                THIS CONVERSATION ARRIVED VIA {s.ticket.source.toUpperCase()}. REPLIES GO BACK THE SAME WAY.
+              </p>
+            )}
 
-        {/* ---------- middle: the conversation, as a messaging thread ---------- */}
-        <section className="border-r border-[var(--line)] px-7 py-6 min-h-[60vh]">
-          <div className="flex flex-col gap-4">
             {messages.map((m, i) => {
               if (m.role === "internal") {
                 // an internal note is not part of the conversation, so it does not get a
@@ -160,31 +202,54 @@ export default function TicketDetail() {
               }
               const mine = m.role !== "customer";
               return (
-                <div key={i} className={`flex gap-2.5 items-end ${mine ? "flex-row-reverse" : ""}`}>
-                  <span
-                    className={`w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[10px] ${
-                      mine ? "bg-[var(--ox)] text-[var(--paper)]" : "bg-[var(--line)] text-[var(--ink)]"
-                    }`}
-                  >
-                    {mine ? "NS" : custInitials}
-                  </span>
-                  <div className={`max-w-[74%] ${mine ? "text-right" : ""}`}>
-                    <div
-                      className={`inline-block text-left px-3.5 py-2.5 text-[13.6px] leading-relaxed whitespace-pre-wrap rounded-2xl ${
-                        mine
-                          ? "bg-[var(--ox)] text-[var(--paper)] rounded-br-[5px]"
-                          : "bg-white border border-[var(--line)] rounded-bl-[5px]"
+                <div key={i}>
+                  {/* the verdict happened between their first message and whatever followed */}
+                  {i === 1 && verdictLine && (
+                    <p className="text-center mb-4">
+                      <span className="font-array text-[10px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
+                        {verdictLine.toUpperCase()}
+                      </span>
+                    </p>
+                  )}
+                  <div className={`flex gap-2.5 items-end ${mine ? "flex-row-reverse" : ""}`}>
+                    <span
+                      className={`w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[10px] ${
+                        mine ? "bg-[var(--ox)] text-[var(--paper)]" : "bg-[var(--line)] text-[var(--ink)]"
                       }`}
                     >
-                      {m.body}
-                    </div>
-                    <span className="block font-array text-[9.5px] tracking-[0.12em] text-[var(--mut)] mt-1 px-1">
-                      {mine ? "NIMBUS SUPPORT" : (s.ticket.customer_name ?? "CUSTOMER").toUpperCase()}
+                      {mine ? "NS" : custInitials}
                     </span>
+                    <div className={`max-w-[74%] ${mine ? "text-right" : ""}`}>
+                      <div
+                        className={`inline-block text-left px-3.5 py-2.5 text-[13.6px] leading-relaxed whitespace-pre-wrap rounded-2xl ${
+                          mine
+                            ? "bg-[var(--ox)] text-[var(--paper)] rounded-br-[5px]"
+                            : "bg-white border border-[var(--line)] rounded-bl-[5px]"
+                        }`}
+                      >
+                        {m.body}
+                      </div>
+                      <span className="block font-array text-[9.5px] tracking-[0.12em] text-[var(--mut)] mt-1 px-1">
+                        {mine
+                          ? `NIMBUS SUPPORT${channel ? ` · SENT VIA ${channel.toUpperCase()}` : ""}${
+                              autoHandled && i === 1 ? " · ⚡ AUTO-SENT" : ""
+                            }`
+                          : (s.ticket.customer_name ?? "CUSTOMER").toUpperCase()}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
             })}
+
+            {/* escalated with no agent turn yet: the verdict line still needs a home */}
+            {messages.length === 1 && verdictLine && (
+              <p className="text-center">
+                <span className="font-array text-[10px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
+                  {verdictLine.toUpperCase()}
+                </span>
+              </p>
+            )}
 
             {/* the pipeline is mid-flight: the messaging-app equivalent of "typing…" */}
             {s.human_status === "processing" && (
@@ -201,24 +266,45 @@ export default function TicketDetail() {
             )}
           </div>
 
-          {!locked && (
-            <div className="flex gap-2 mt-6">
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addNote()}
-                placeholder="Add an internal note (customers never see these)"
-                className="input flex-1 text-[13.5px]"
+          <div className="max-w-[780px] mx-auto mt-6">
+            {!locked && (
+              <div className="flex gap-2 mb-4">
+                <input
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addNote()}
+                  placeholder="Add an internal note (customers never see these)"
+                  className="input flex-1 text-[13.5px]"
+                />
+                <button onClick={addNote} className="btn btn-outline">
+                  Note
+                </button>
+              </div>
+            )}
+
+            {locked ? (
+              <div>
+                <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
+                <button onClick={reopen} className={`btn mt-3 ${reopenArmed ? "btn-armed" : "btn-quiet"}`}>
+                  {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
+                </button>
+              </div>
+            ) : (
+              <Actions
+                id={id}
+                reply={s.draft.reply ?? ""}
+                currentAssignee={s.decision.assignee?.name ?? ""}
+                confidence={conf}
+                escalated={escalated}
+                channel={channel}
+                customerEmail={s.ticket.customer_email}
               />
-              <button onClick={addNote} className="btn btn-outline">
-                Note
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </section>
 
-        {/* ---------- right: the machine's verdict, then the composer ---------- */}
-        <section className="px-6 py-6 sticky top-4">
+        {/* ---------- right drawer: verdict detail + everything we know ---------- */}
+        <aside className="border-l border-[var(--line)] bg-[var(--paper-2)] px-5 py-6 sticky top-4">
           <span className="field">The machine&apos;s verdict</span>
           <div className="flex items-center gap-2.5">
             <span
@@ -238,29 +324,12 @@ export default function TicketDetail() {
             )}
           </div>
           {s.decision.reason && (
-            <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">
-              GROUNDS: {s.decision.reason.toUpperCase()}
-            </p>
+            <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">GROUNDS: {s.decision.reason.toUpperCase()}</p>
           )}
 
-          <div className="mt-5">
-            {locked ? (
-              <div>
-                <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
-                <button onClick={reopen} className={`btn mt-3 ${reopenArmed ? "btn-armed" : "btn-quiet"}`}>
-                  {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
-                </button>
-              </div>
-            ) : (
-              <Actions
-                id={id}
-                reply={s.draft.reply ?? ""}
-                currentAssignee={s.decision.assignee?.name ?? ""}
-                confidence={conf}
-              />
-            )}
+          <div className="mt-4">
+            <CustomerRail id={id} tags={tagChips} />
           </div>
-
           <Related
             id={id}
             related={s.related ?? []}
@@ -270,7 +339,7 @@ export default function TicketDetail() {
             onChange={load}
           />
           <Attachments id={id} locked={locked} />
-        </section>
+        </aside>
       </div>
     </main>
   );

@@ -14,11 +14,17 @@ export default function Actions({
   reply,
   currentAssignee = "",
   confidence,
+  escalated = false,
+  channel = "",
+  customerEmail,
 }: {
   id: string;
   reply: string;
   currentAssignee?: string;
   confidence?: number;
+  escalated?: boolean; // the draft card only exists when the machine held back
+  channel?: string; // "email" | "Jira" | "Zendesk" | "" (in-app)
+  customerEmail?: string | null;
 }) {
   const router = useRouter();
   const [text, setText] = useState(""); // the composer starts EMPTY, by design
@@ -110,14 +116,17 @@ export default function Actions({
     }
   }
 
-  const showSuggestion = !!suggestion.trim() && !dismissed;
+  // auto-send means the machine already sent it: showing a draft then would be a lie.
+  // The card exists only while the machine has held back and is waiting on a human.
+  const showSuggestion = escalated && !!suggestion.trim() && !dismissed;
+  const sendLabel = channel === "email" ? "Send as email ✉" : channel ? `Send as ${channel} comment` : "Send";
 
   return (
     <div>
       {showSuggestion && (
-        <div className="border border-dashed border-[var(--ox)] rounded-[10px] bg-[var(--paper)] px-4 py-3 mb-3">
+        <div className="border border-dashed border-[var(--rust)] rounded-[10px] bg-[var(--paper)] px-4 py-3 mb-3">
           <div className="flex items-center gap-2">
-            <span className="field !mb-0">Suggested reply</span>
+            <span className="field !mb-0 !text-[var(--rust)]">Draft · waiting on you · not sent</span>
             {typeof confidence === "number" && (
               <span className="font-array text-[10.5px] text-[var(--mut)] ml-auto">{confidence}</span>
             )}
@@ -125,10 +134,10 @@ export default function Actions({
           <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap mt-2 max-w-[68ch]">{suggestion}</p>
           <div className="flex flex-wrap gap-2 mt-3">
             <button onClick={() => { setText(suggestion); void send(); }} disabled={busy} className="btn disabled:opacity-50">
-              Use this
+              Approve &amp; {sendLabel.toLowerCase()}
             </button>
             <button onClick={() => setText(suggestion)} disabled={busy} className="btn btn-outline disabled:opacity-50">
-              Use &amp; edit
+              Edit first
             </button>
             <button onClick={() => setDismissed(true)} className="btn-link btn-link-mut">
               Dismiss
@@ -165,12 +174,12 @@ export default function Actions({
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Write a reply to the customer…"
+          placeholder={escalated ? "Or write your own reply…" : "Add to the conversation…"}
           className="w-full h-32 px-4 py-3 text-[13.5px] leading-relaxed bg-transparent outline-none resize-y"
         />
         <div className="flex flex-wrap gap-2 items-center px-3 py-2.5 border-t border-[var(--line)]">
           <button onClick={send} disabled={busy || !text.trim()} className="btn disabled:opacity-40">
-            {busy ? "Working…" : "Send"}
+            {busy ? "Working…" : sendLabel}
           </button>
           <button onClick={() => act("reject")} disabled={busy} className="btn-link text-[var(--rust)]">
             Reject
@@ -191,7 +200,13 @@ export default function Actions({
           </button>
         </div>
       </div>
-      <p className="field mt-2">Nothing sends without you</p>
+      <p className="field mt-2">
+        {channel === "email" && customerEmail
+          ? `Replies leave as email · to: ${customerEmail}`
+          : channel
+            ? `Replies post back to the ${channel} ticket`
+            : "Nothing sends without you"}
+      </p>
 
       {delivery && <p className="font-array text-[11px] text-[var(--olive)] mt-3">{delivery.toUpperCase()}</p>}
       {actError && <p className="font-array text-[11px] text-[var(--rust)] mt-3">{actError.toUpperCase()}</p>}

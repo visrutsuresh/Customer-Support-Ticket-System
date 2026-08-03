@@ -66,7 +66,8 @@ export default function CustomerRail({ id, tags }: { id: string; tags: React.Rea
   const p = rec?.profile ?? null;
 
   return (
-    <aside className="bg-[var(--paper-2)] border-r border-[var(--line)] px-5 py-6">
+    // ponytail: no own chrome; the ticket page's right drawer supplies bg and border
+    <aside>
       <Section label="Customer">
         {p ? (
           <>
