@@ -54,12 +54,23 @@ export default function PortalHome() {
             className="flex items-end gap-4 border-b-2 border-[var(--ink)] pb-3 rise"
             style={{ "--i": 1 } as React.CSSProperties}
           >
-            <input
+            <textarea
               value={line}
-              onChange={(e) => setLine(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && start()}
+              rows={1}
+              onChange={(e) => {
+                setLine(e.target.value);
+                // grow with the text: Enter starts, Shift+Enter adds a line
+                e.target.style.height = "auto";
+                e.target.style.height = `${e.target.scrollHeight}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  start();
+                }
+              }}
               placeholder={`What's going on, ${user.email.split("@")[0]}?`}
-              className="flex-1 bg-transparent outline-none text-[42px] font-bold leading-tight placeholder:text-[#cfc7b4] caret-[var(--ox)]"
+              className="flex-1 bg-transparent outline-none resize-none overflow-hidden text-[42px] font-bold leading-tight placeholder:text-[#cfc7b4] caret-[var(--ox)]"
               style={{ fontFamily: "var(--font-cabinet)" }}
             />
             <button onClick={start} className="btn shrink-0 !text-[15px] !px-7 !py-3">
