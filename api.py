@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app import billing, crm, jira_channel, kb, orders, ratelimit, store
+from app import billing, crm, jira_channel, kb, orders, ratelimit, router, store
 from app.agents import learn_agent
 from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
@@ -338,6 +338,45 @@ def customer_history(ticket_id: str, user: User = Depends(require_staff)):
     if not email:
         return []
     return [r for r in store.list_by_email(email) if r["ticket_id"] != ticket_id]
+
+
+# --- GPU prewarm ------------------------------------------------------------
+# The private lane sleeps after an idle window and the next call pays a cold start of
+# roughly a minute. Someone opening the login screen is about 30 to 60 seconds away from
+# doing anything that needs a model, so waking the container now hides most of that
+# behind their typing.
+#
+# Two guards, because this route is necessarily unauthenticated and a wake costs real
+# money: a per-IP rate limit, and a GLOBAL cooldown so that however many people load the
+# page, the lane is poked at most once per PREWARM_COOLDOWN_S. Off unless PREWARM=true.
+PREWARM = os.getenv("PREWARM", "false").lower() == "true"
+PREWARM_COOLDOWN_S = int(os.getenv("PREWARM_COOLDOWN_S", "240"))
+_last_warm = 0.0
+_warm_lock = threading.Lock()
+
+
+def _warm_lane() -> None:
+    try:
+        # the smallest call that still forces the container up; the answer is discarded
+        router.think("ping", max_new_tokens=1)
+    except Exception as e:
+        print(f"[prewarm] lane wake failed: {e}", flush=True)
+
+
+@app.post("/warm", status_code=202)
+def warm(background: BackgroundTasks, request: Request):
+    if not PREWARM:
+        return {"warmed": False, "reason": "disabled"}
+    ratelimit.check(f"warm:{ratelimit.client_ip(request)}", 3, 300)
+    global _last_warm
+    with _warm_lock:
+        now = time.monotonic()
+        if now - _last_warm < PREWARM_COOLDOWN_S:
+            # already warm, or someone else just paid for the wake
+            return {"warmed": False, "reason": "cooling down"}
+        _last_warm = now
+    background.add_task(_warm_lane)  # returns immediately; the caller never waits
+    return {"warmed": True}
 
 
 @app.get("/tickets/{ticket_id}/customer")

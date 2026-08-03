@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { CloudMark, EyeIcon } from "@/lib/icons";
@@ -7,6 +7,13 @@ import { login, register } from "@/lib/useUser";
 
 export default function LoginPage() {
   const router = useRouter();
+  // Wake the GPU while they are still typing. Signing in and writing a request takes
+  // 30 to 60 seconds, which is roughly a cold start, so this hides most of it. Fire and
+  // forget on purpose: it must never block, delay or fail the login screen, and the
+  // server refuses politely when it is already warm or the feature is off.
+  useEffect(() => {
+    api("/warm", { method: "POST" }).catch(() => {});
+  }, []);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [showPw, setShowPw] = useState(false);
   const [email, setEmail] = useState("");

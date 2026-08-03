@@ -22,6 +22,7 @@ Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (s
 | GET | `/` | Health, plus which pipeline mode and model tier are active. Instant and dependency-free, for uptime pings |
 | GET | `/healthz` | The honest health check: probes Postgres and Weaviate and reports each, `status` is `ok` only if both answer |
 | GET | `/config` | Brand name and tagline for the portal |
+| POST | `/warm` | Wakes the private model lane and returns `202` immediately without waiting for it. The login screen calls this on load, so the roughly one-minute cold start runs while the visitor is signing in rather than in front of their first ticket. Unauthenticated by necessity, so it is guarded three ways: disabled unless `PREWARM=true`, rate limited per address, and a **global** cooldown means that however many people load the page the lane is woken at most once per `PREWARM_COOLDOWN_S`. Returns `{"warmed": false}` when it declines |
 
 ## 3. Tickets
 

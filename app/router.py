@@ -9,6 +9,11 @@ LANE_URL = os.environ["PRIVATE_LANE_URL"]
 LANE_TOKEN = os.environ["PRIVATE_LANE_TOKEN"]
 REVIEW_URL = os.environ["REVIEW_LANE_URL"]
 MODEL_TIER = os.getenv("MODEL_TIER", "dev").lower()
+# autonomous mode only: run tool-selection steps on the small model. See think_model().
+# Defaults to OFF because bench_autonomous.json was measured with every step on the 14B,
+# and a default that silently differs from the benchmarked configuration would make the
+# published escalation numbers describe something nobody runs.
+_FAST_LOOP = os.getenv("AGENT_FAST", "false").lower() == "true"
 
 # Claude model ids for the cloud lane
 HAIKU = "claude-haiku-4-5"
@@ -73,10 +78,19 @@ def reply_model(lane: str, level: str) -> str:
     return intended_model(lane, level)  # full
 
 
-def think_model(lane: str = None, level: str = None) -> str:
+def think_model(lane: str = None, level: str = None, cheap: bool = False) -> str:
     # which model does the agent's reasoning capped by the MODEL_TIER in .env
     # dev/local pin reasoning to private line; only 'full' unlocks cloud lane with Claude
     if MODEL_TIER == "dev":
+        return "3b"
+    # `cheap` marks a step that only PICKS THE NEXT TOOL rather than judging anything.
+    # In autonomous mode most calls are that, and running them on the 14B was the single
+    # biggest cost in wall clock: a mean of ~4 loop steps across 4 agents, all on the big
+    # model, for decisions of the form "do I need the order lookup or the billing one".
+    # The 14B still writes the customer's reply and still sits the compliance review,
+    # which are the two places judgement actually matters. Set AGENT_FAST=false to put
+    # every step back on the 14B.
+    if cheap and _FAST_LOOP:
         return "3b"
     if MODEL_TIER == "local":
         return "14b"
@@ -85,9 +99,9 @@ def think_model(lane: str = None, level: str = None) -> str:
     return intended_model("cloud", level or "complex")
 
 
-def think(prompt: str, max_new_tokens: int = 256, lane: str = None, level: str = None) -> str:
+def think(prompt: str, max_new_tokens: int = 256, lane: str = None, level: str = None, cheap: bool = False) -> str:
     # every internal reasoning check goes through here
-    return call_model(think_model(lane, level), prompt, max_new_tokens)
+    return call_model(think_model(lane, level, cheap), prompt, max_new_tokens)
 
 
 def generate_reply(prompt: str, lane: str, level: str, max_new_tokens: int = 512) -> str:
