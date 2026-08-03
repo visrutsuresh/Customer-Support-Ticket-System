@@ -5,6 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import Actions from "./actions";
 import Attachments from "./attachments";
+import CustomerRail from "./customer-rail";
 import Related from "./related";
 
 type Msg = { role: string; body: string };
@@ -22,7 +23,11 @@ type State = {
   merged_into?: string | null;
 };
 
-type HistoryRow = { ticket_id: string; subject: string; human_status: string; lifecycle: string; created_at: string | null };
+function initials(name?: string | null, email?: string | null) {
+  const src = (name || email || "?").trim();
+  const parts = src.split(/[\s@._-]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "?") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +36,6 @@ export default function TicketDetail() {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [newTag, setNewTag] = useState("");
-  const [history, setHistory] = useState<HistoryRow[]>([]);
   const [reopenArmed, setReopenArmed] = useState(false);
 
   const load = useCallback(() => {
@@ -49,11 +53,6 @@ export default function TicketDetail() {
     const i = setInterval(load, 4000); // keep in sync with the other side's resolve
     return () => clearInterval(i);
   }, [load]);
-
-  useEffect(() => {
-    // need-to-know: this customer's past tickets, unlocked by having their ticket open
-    api(`/tickets/${id}/history`).then(setHistory).catch(() => setHistory([]));
-  }, [id]);
 
   async function reopen() {
     // double confirm: first press arms, second press fires
@@ -90,17 +89,41 @@ export default function TicketDetail() {
 
   const conf = s.decision.confidence ?? s.draft.confidence;
   const locked = s.lifecycle === "resolved";
-  const who = (m: Msg) =>
-    m.role === "customer" ? (s.ticket.customer_name ?? "CUSTOMER") : m.role === "internal" ? "INTERNAL NOTE" : "NIMBUS SUPPORT";
+  const escalated = s.decision.action === "escalate";
+  const messages = s.messages ?? [{ role: "customer", body: s.ticket.body }];
+  const custInitials = initials(s.ticket.customer_name, s.ticket.customer_email);
+
+  const tagChips = (
+    <div className="flex flex-wrap gap-1.5 items-center">
+      {(s.tags ?? []).map((tag) => (
+        <span key={tag} className="chip">
+          {tag.toUpperCase()}
+          {!locked && (
+            <button onClick={() => removeTag(tag)} className="ml-1.5 text-[var(--rust)]">
+              ×
+            </button>
+          )}
+        </span>
+      ))}
+      {!locked && (
+        <input
+          value={newTag}
+          onChange={(e) => setNewTag(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addTag()}
+          placeholder="+ TAG"
+          className="chip w-20 bg-transparent border-dashed focus:border-[var(--ox)] outline-none placeholder:text-[var(--mut)]"
+        />
+      )}
+    </div>
+  );
 
   return (
-    <main className="max-w-6xl px-10 py-9">
-      <Link href="/workspace" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)]">
-        ← BACK TO QUEUE
-      </Link>
-
-      <div className="border-b border-[var(--ink)] pb-4 mt-3 rise" style={{ "--i": 0 } as React.CSSProperties}>
-        <h1 className="text-[28px] font-bold leading-tight">{s.ticket.subject}</h1>
+    <main className="max-w-[1500px]">
+      <div className="px-8 pt-7 pb-4 border-b border-[var(--ink)]">
+        <Link href="/workspace" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)]">
+          ← BACK TO QUEUE
+        </Link>
+        <h1 className="text-[26px] font-bold leading-tight mt-2">{s.ticket.subject}</h1>
         <div className="font-array text-[11px] text-[var(--mut)] mt-2 flex flex-wrap gap-x-5 gap-y-1">
           <span>{id.toUpperCase()}</span>
           <span>
@@ -112,117 +135,132 @@ export default function TicketDetail() {
           <span>
             PRI <b className="text-[var(--ink)] font-semibold">{(s.classification.priority ?? "—").toUpperCase()}</b>
           </span>
-          <span>
-            {s.ticket.customer_name} · {s.ticket.customer_email}
-          </span>
           {s.decision.assignee?.name && <span>ASSIGNED {s.decision.assignee.name.toUpperCase()}</span>}
         </div>
       </div>
 
-      <div className="grid grid-cols-[1.6fr_1fr] gap-0 items-start">
-        {/* thread */}
-        <div className="border-r border-[var(--line)] py-6 pr-8 space-y-6">
-          {(s.messages ?? [{ role: "customer", body: s.ticket.body }]).map((m, i) => (
-            <div
-              key={i}
-              className={`rise ${m.role === "internal" ? "panel" : ""}`}
-              style={{ "--i": i + 1 } as React.CSSProperties}
-            >
-              <div className="font-array text-[10.5px] text-[var(--mut)] mb-1.5">{who(m).toUpperCase()}</div>
-              <p
-                className={`whitespace-pre-wrap text-[14.5px] max-w-[60ch] ${
-                  m.role === "customer"
-                    ? "border-l-2 border-[var(--ink)] pl-3.5"
-                    : m.role === "agent"
-                      ? "border-l-2 border-[var(--ox)] pl-3.5"
-                      : ""
-                }`}
-              >
-                {m.body}
-              </p>
-            </div>
-          ))}
-          {!locked && (
-          <div className="flex gap-2 pt-2">
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addNote()}
-              placeholder="Add an internal note (customers never see these)"
-              className="input flex-1 text-[13.5px]"
-            />
-            <button onClick={addNote} className="btn btn-outline">
-              Note
-            </button>
-          </div>
-          )}
-        </div>
+      <div className="grid grid-cols-[248px_minmax(0,1.5fr)_minmax(0,1fr)] items-start">
+        {/* ---------- left: who this is ---------- */}
+        <CustomerRail id={id} tags={tagChips} />
 
-        {/* AI panel */}
-        <div className="py-6 pl-8 sticky top-6 rise" style={{ "--i": 2 } as React.CSSProperties}>
-          <div className="flex items-baseline gap-3">
-            <h2 className="text-[18px] font-bold">Drafted reply</h2>
-            <span className={`font-array text-[10.5px] ${s.decision.action === "escalate" ? "text-[var(--rust)]" : "text-[var(--olive)]"}`}>
-              {(s.decision.action ?? "…").toUpperCase()}
-            </span>
-          </div>
-          {typeof conf === "number" && (
-            <div className="flex items-center gap-3 mt-4 mb-1">
-              <span className="font-array text-[10.5px] text-[var(--mut)]">CONFIDENCE</span>
-              <div className="flex-1 h-[3px] bg-[var(--line)]">
-                <div className="h-full bg-[var(--ox)] transition-all duration-1000" style={{ width: `${conf}%` }} />
+        {/* ---------- middle: the conversation, as a messaging thread ---------- */}
+        <section className="border-r border-[var(--line)] px-7 py-6 min-h-[60vh]">
+          <div className="flex flex-col gap-4">
+            {messages.map((m, i) => {
+              if (m.role === "internal") {
+                // an internal note is not part of the conversation, so it does not get a
+                // bubble: it sits between them as a system line the customer never sees
+                return (
+                  <div key={i} className="self-center max-w-[80%]">
+                    <p className="font-array text-[10px] tracking-[0.14em] text-[var(--mut)] bg-[var(--paper-2)] border border-dashed border-[var(--line)] rounded-full px-3.5 py-1.5">
+                      INTERNAL NOTE · {m.body.toUpperCase()}
+                    </p>
+                  </div>
+                );
+              }
+              const mine = m.role !== "customer";
+              return (
+                <div key={i} className={`flex gap-2.5 items-end ${mine ? "flex-row-reverse" : ""}`}>
+                  <span
+                    className={`w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[10px] ${
+                      mine ? "bg-[var(--ox)] text-[var(--paper)]" : "bg-[var(--line)] text-[var(--ink)]"
+                    }`}
+                  >
+                    {mine ? "NS" : custInitials}
+                  </span>
+                  <div className={`max-w-[74%] ${mine ? "text-right" : ""}`}>
+                    <div
+                      className={`inline-block text-left px-3.5 py-2.5 text-[13.6px] leading-relaxed whitespace-pre-wrap rounded-2xl ${
+                        mine
+                          ? "bg-[var(--ox)] text-[var(--paper)] rounded-br-[5px]"
+                          : "bg-white border border-[var(--line)] rounded-bl-[5px]"
+                      }`}
+                    >
+                      {m.body}
+                    </div>
+                    <span className="block font-array text-[9.5px] tracking-[0.12em] text-[var(--mut)] mt-1 px-1">
+                      {mine ? "NIMBUS SUPPORT" : (s.ticket.customer_name ?? "CUSTOMER").toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* the pipeline is mid-flight: the messaging-app equivalent of "typing…" */}
+            {s.human_status === "processing" && (
+              <div className="flex gap-2.5 items-end">
+                <span className="w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[10px] bg-[var(--ox)] text-[var(--paper)]">
+                  NS
+                </span>
+                <div className="bg-white border border-[var(--line)] rounded-2xl rounded-bl-[5px] px-4 py-3 flex gap-1.5">
+                  <i className="w-1.5 h-1.5 rounded-full bg-[var(--mut)] animate-bounce [animation-delay:0ms]" />
+                  <i className="w-1.5 h-1.5 rounded-full bg-[var(--mut)] animate-bounce [animation-delay:150ms]" />
+                  <i className="w-1.5 h-1.5 rounded-full bg-[var(--mut)] animate-bounce [animation-delay:300ms]" />
+                </div>
               </div>
-              <span className="font-array font-semibold text-[15px]">{conf}</span>
-            </div>
-          )}
-          {s.decision.reason && (
-            <div className="font-array text-[10.5px] text-[var(--mut)] mb-3">GROUNDS: {s.decision.reason.toUpperCase()}</div>
-          )}
-          {s.human_status === "processing" && (
-            <div className="mt-3">
-              <span className="workbar w-full" />
-              <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">
-                THE AGENTS ARE WORKING ON THIS TICKET
-              </p>
-            </div>
-          )}
-          {locked ? (
-            <div className="mt-3">
-              <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
-              <button
-                onClick={reopen}
-                className={`btn mt-3 ${reopenArmed ? "btn-armed" : "btn-quiet"}`}
-              >
-                {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
+            )}
+          </div>
+
+          {!locked && (
+            <div className="flex gap-2 mt-6">
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addNote()}
+                placeholder="Add an internal note (customers never see these)"
+                className="input flex-1 text-[13.5px]"
+              />
+              <button onClick={addNote} className="btn btn-outline">
+                Note
               </button>
             </div>
-          ) : (
-            <Actions id={id} reply={s.draft.reply ?? ""} currentAssignee={s.decision.assignee?.name ?? ""} />
           )}
-          <div className="border-t border-[var(--line)] mt-6 pt-4">
-            <span className="font-array text-[10.5px] text-[var(--mut)]">TAGS</span>
-            <div className="mt-2 flex flex-wrap gap-2 items-center">
-              {(s.tags ?? []).map((tag) => (
-                <span key={tag} className="chip">
-                  {tag.toUpperCase()}
-                  {!locked && (
-                    <button onClick={() => removeTag(tag)} className="ml-1.5 text-[var(--rust)]">
-                      ×
-                    </button>
-                  )}
-                </span>
-              ))}
-              {!locked && (
-                <input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addTag()}
-                  placeholder="+ TAG"
-                  className="chip w-20 bg-transparent border-dashed focus:border-[var(--ox)] outline-none placeholder:text-[var(--mut)]"
-                />
-              )}
-            </div>
+        </section>
+
+        {/* ---------- right: the machine's verdict, then the composer ---------- */}
+        <section className="px-6 py-6 sticky top-4">
+          <span className="field">The machine&apos;s verdict</span>
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`font-array text-[10px] tracking-[0.14em] px-2.5 py-1 rounded-[3px] text-[var(--paper)] ${
+                escalated ? "bg-[var(--rust)]" : "bg-[var(--olive)]"
+              }`}
+            >
+              {(s.decision.action ?? "…").toUpperCase()}
+            </span>
+            {typeof conf === "number" && (
+              <>
+                <div className="flex-1 h-[3px] bg-[var(--line)]">
+                  <div className="h-full bg-[var(--ox)] transition-all duration-1000" style={{ width: `${conf}%` }} />
+                </div>
+                <span className="font-array font-semibold text-[14px]">{conf}</span>
+              </>
+            )}
           </div>
+          {s.decision.reason && (
+            <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">
+              GROUNDS: {s.decision.reason.toUpperCase()}
+            </p>
+          )}
+
+          <div className="mt-5">
+            {locked ? (
+              <div>
+                <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
+                <button onClick={reopen} className={`btn mt-3 ${reopenArmed ? "btn-armed" : "btn-quiet"}`}>
+                  {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
+                </button>
+              </div>
+            ) : (
+              <Actions
+                id={id}
+                reply={s.draft.reply ?? ""}
+                currentAssignee={s.decision.assignee?.name ?? ""}
+                confidence={conf}
+              />
+            )}
+          </div>
+
           <Related
             id={id}
             related={s.related ?? []}
@@ -232,33 +270,7 @@ export default function TicketDetail() {
             onChange={load}
           />
           <Attachments id={id} locked={locked} />
-          {history.length > 0 && (
-            <div className="border-t border-[var(--line)] mt-6 pt-4">
-              <span className="font-array text-[10.5px] text-[var(--mut)]">
-                THIS CUSTOMER&apos;S PAST TICKETS
-              </span>
-              <ul className="mt-2 space-y-1.5">
-                {history.slice(0, 6).map((h) => (
-                  <li key={h.ticket_id} className="text-[12.5px] flex items-baseline gap-2">
-                    <span className="font-array text-[10px] text-[var(--mut)] shrink-0">
-                      {h.lifecycle === "resolved" ? "RESOLVED" : "OPEN"}
-                    </span>
-                    {h.lifecycle === "resolved" ? (
-                      <span className="text-[var(--mut)]">{h.subject}</span>
-                    ) : (
-                      <Link
-                        href={`/workspace/tickets/${h.ticket_id}`}
-                        className="hover:text-[var(--ox)] underline underline-offset-2"
-                      >
-                        {h.subject}
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        </section>
       </div>
     </main>
   );

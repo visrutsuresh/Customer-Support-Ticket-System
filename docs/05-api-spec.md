@@ -33,6 +33,7 @@ Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (s
 | POST | `/tickets/{id}/assign` | staff | Manual assignment: `{"assignee": "dana"}` sets it, `{"assignee": null}` clears it back to unassigned. Free text on purpose, the pipeline writes short names into the same column. 404 on a missing ticket, 409 if the ticket is resolved |
 | GET | `/tickets/{id}` | staff | The full stored state |
 | GET | `/tickets/{id}/history` | staff | That customer's other tickets, unlocked by having this one open |
+| GET | `/tickets/{id}/customer` | staff | That customer's record: profile, five most recent orders, five most recent charges. Same need-to-know rule as `/history`, holding this ticket open unlocks this customer and nobody else. These are the lookups the autonomous agents already make as tools, surfaced so a human reviewer is not worse informed than the pipeline that drafted the reply. Each store is read independently, so one being empty or unreachable returns nulls rather than failing the panel. `{"profile": null, ...}` for a sender who is not in the records, which is normal for email and Jira |
 | GET | `/tickets/{id}/thread` | owner or staff | The customer-safe message list, internal notes stripped |
 | POST | `/tickets/{id}/reply` | owner or staff | Adds a customer turn and re-runs the pipeline in the background |
 | POST | `/tickets/{id}/resolve` | owner or staff | Optional `{csat: 1-10}`. Archives the ticket, cancels any in-flight run, closes the Jira issue if there is one, and files the resolution back into the knowledge base |

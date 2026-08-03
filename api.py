@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app import jira_channel, kb, ratelimit, store
+from app import billing, crm, jira_channel, kb, orders, ratelimit, store
 from app.agents import learn_agent
 from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
@@ -338,6 +338,32 @@ def customer_history(ticket_id: str, user: User = Depends(require_staff)):
     if not email:
         return []
     return [r for r in store.list_by_email(email) if r["ticket_id"] != ticket_id]
+
+
+@app.get("/tickets/{ticket_id}/customer")
+def customer_record(ticket_id: str, user: User = Depends(require_staff)):
+    # the same need-to-know rule as /history: holding this customer's ticket open
+    # unlocks THEIR record, and nothing else. These are the lookups the autonomous
+    # agents already make as tools; this puts the same facts on the agent's screen so
+    # a human is not worse informed than the pipeline that drafted the reply.
+    state = store.get(ticket_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="ticket not found")
+    email = state["ticket"].get("customer_email") or ""
+    if not email:
+        return {"profile": None, "orders": [], "charges": []}
+    # each store is independent; one being empty or unreachable must not blank the panel
+    def _safe(fn, fallback):
+        try:
+            return fn(email)
+        except Exception:
+            return fallback
+
+    return {
+        "profile": _safe(crm.lookup, None),
+        "orders": _safe(orders.orders_for, [])[:5],
+        "charges": _safe(billing.charges_for, [])[:5],
+    }
 
 
 def _do_reopen(ticket_id: str) -> str:

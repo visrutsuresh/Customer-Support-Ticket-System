@@ -36,15 +36,24 @@ Administrators can also switch the scope to the archive; staff cannot, and inste
 
 ### Reviewing a ticket
 
-Opening a ticket shows the conversation on one side and the system's work on the other: how it classified the ticket, whether it judged it sensitive, which knowledge articles it used and how strongly they matched, the drafted reply, the compliance verdict, and the decision with its reason.
+Opening a ticket gives you three columns.
+
+**On the left, who you are talking to.** Their plan and account standing, their recent orders with status and tracking, their recent charges, the ticket's tags, and their past tickets. These are the same lookups the agents make while drafting, put on screen so **you are never worse informed than the system that wrote the reply**. A sender who is not in the customer records says so plainly, which is normal for tickets arriving by email or from Jira.
+
+**In the middle, the conversation**, laid out like a messaging thread: the customer on the left, your replies on the right, and internal notes as a line between them that the customer never sees. While the pipeline is still working, a typing indicator shows it is mid-flight rather than stuck.
+
+**On the right, the verdict and your reply.** The system states what it decided, how confident it was and on what grounds. Its proposed wording appears as a **suggested reply** above an empty box: you can use it as it stands, load it into the box to edit, or dismiss it and write your own. Nothing is ever pre-loaded into the box on your behalf, and nothing sends without you pressing send.
 
 Three actions:
 
 | Action | Effect |
 |---|---|
-| **Approve** | Sends the draft to the customer through the channel the ticket arrived on and hands the conversation back to them. Approving an escalation that has no draft simply records your approval and sends nothing |
-| **Edit** | Replace the wording, then send. If the reply had already gone out automatically, your edit corrects the thread record; the copy already delivered by email cannot be recalled |
+| **Use this** | Accepts the suggested wording and sends it, through the channel the ticket arrived on, handing the conversation back to the customer |
+| **Use and edit** | Loads the suggestion into the box so you can change it before sending. Nothing is sent until you press Send |
+| **Dismiss** | Puts the suggestion away and leaves you an empty box to write your own reply |
+| **Send** | Sends whatever is in the box. If you changed the wording, your version is saved over the draft first, so what is recorded is what was actually sent. If a reply had already gone out automatically, your edit corrects the thread record; the copy already delivered by email cannot be recalled |
 | **Reject** | Marks the draft unusable. Nothing is sent |
+| **Mark resolved** | Closes the ticket and files it in the archive |
 
 You can also add an internal note, which the customer never sees, and add or remove tags.
 

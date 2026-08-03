@@ -6,17 +6,23 @@ import { useUser } from "@/lib/useUser";
 
 type Template = { id: number; name: string; category: string | null };
 
+// A3: the machine PROPOSES in a suggestion card and the agent writes in a composer below.
+// Nothing is pre-committed into the box, which is the honest shape for a human-in-the-loop
+// gate: the draft is visibly an offer, not a decision already taken on your behalf.
 export default function Actions({
   id,
   reply,
   currentAssignee = "",
+  confidence,
 }: {
   id: string;
   reply: string;
   currentAssignee?: string;
+  confidence?: number;
 }) {
   const router = useRouter();
-  const [text, setText] = useState(reply);
+  const [text, setText] = useState(""); // the composer starts EMPTY, by design
+  const [dismissed, setDismissed] = useState(false);
   const [delivery, setDelivery] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [applied, setApplied] = useState("");
@@ -24,16 +30,28 @@ export default function Actions({
   const [busy, setBusy] = useState(false);
   const [actError, setActError] = useState("");
   const { user } = useUser();
-  const [assigned, setAssigned] = useState(currentAssignee); // seeded with the ticket's real assignee
+  const [assigned, setAssigned] = useState(currentAssignee);
+  const [suggestion, setSuggestion] = useState(reply);
+
+  // the ticket polls every 4s; adopt a newly generated draft unless the agent has
+  // already dismissed it or started typing over it
+  useEffect(() => {
+    if (!dismissed && !text) setSuggestion(reply);
+  }, [reply, dismissed, text]);
+
+  useEffect(() => {
+    api("/templates").then(setTemplates).catch(() => setTemplates([]));
+  }, []);
+
+  const shortName = user?.email.split("@")[0] ?? "";
 
   async function assignToMe() {
     if (busy || !user) return;
     setBusy(true);
     setActError("");
     try {
-      const me = user.email.split("@")[0]; // matches the short names the AI writes in the column
-      await api(`/tickets/${id}/assign`, { method: "POST", body: JSON.stringify({ assignee: me }) });
-      setAssigned(me);
+      await api(`/tickets/${id}/assign`, { method: "POST", body: JSON.stringify({ assignee: shortName }) });
+      setAssigned(shortName);
     } catch (e) {
       setActError(`Assign failed: ${e}`);
     } finally {
@@ -41,21 +59,14 @@ export default function Actions({
     }
   }
 
-  useEffect(() => {
-    // staff-only endpoint, and this strip only ever renders for staff
-    api("/templates").then(setTemplates).catch(() => setTemplates([]));
-  }, []);
-
   async function applyTemplate(templateId: number) {
     setMacroError("");
     try {
-      // the server overwrites the stored draft and hands back the body it used,
-      // so the box shows exactly what was saved rather than a local guess
       const out = await api(`/tickets/${id}/apply-template`, {
         method: "POST",
         body: JSON.stringify({ template_id: templateId }),
       });
-      setText(out.reply);
+      setText(out.reply); // a macro is something you are about to send, so it lands in the composer
       setApplied(out.applied_template);
     } catch (e) {
       setMacroError(`That macro did not apply: ${e}`);
@@ -63,43 +74,72 @@ export default function Actions({
   }
 
   async function act(kind: string) {
-    if (busy) return; // a double-click must not double-send the customer an email
+    if (busy) return; // a double-click must not send the customer two emails
     setBusy(true);
     setActError("");
     try {
       const out = await api(`/tickets/${id}/${kind}`, { method: "POST" });
       if (out?.delivery) {
-        setDelivery(`Delivered: ${out.delivery}`); // show how it left the building before we bounce
+        setDelivery(`Delivered: ${out.delivery}`);
         setTimeout(() => router.push("/workspace"), 1200);
       } else {
         router.push("/workspace");
       }
     } catch (e) {
-      // if resolve renamed the id mid-flight the page redirect unmounts us anyway;
-      // a real failure stays on screen instead of silently bouncing to the queue
       setActError(`That did not go through: ${e}`);
       setBusy(false);
     }
   }
 
-  async function saveEdit() {
+  // send whatever is in the composer: save it over the stored draft first, because
+  // /approve sends the STORED draft, not whatever the screen happens to show
+  async function send() {
     if (busy) return;
+    const body = text.trim();
+    if (!body) return;
     setBusy(true);
     setActError("");
     try {
-      await api(`/tickets/${id}/edit`, { method: "POST", body: JSON.stringify({ reply: text }) });
-      router.push("/workspace");
+      if (body !== suggestion.trim()) {
+        await api(`/tickets/${id}/edit`, { method: "POST", body: JSON.stringify({ reply: body }) });
+      }
+      await act("approve");
     } catch (e) {
-      setActError(`Save failed: ${e}`);
+      setActError(`Send failed: ${e}`);
       setBusy(false);
     }
   }
 
+  const showSuggestion = !!suggestion.trim() && !dismissed;
+
   return (
-    <div className="mt-2">
+    <div>
+      {showSuggestion && (
+        <div className="border border-dashed border-[var(--ox)] rounded-[10px] bg-[var(--paper)] px-4 py-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="field !mb-0">Suggested reply</span>
+            {typeof confidence === "number" && (
+              <span className="font-array text-[10.5px] text-[var(--mut)] ml-auto">{confidence}</span>
+            )}
+          </div>
+          <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap mt-2 max-w-[68ch]">{suggestion}</p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button onClick={() => { setText(suggestion); void send(); }} disabled={busy} className="btn disabled:opacity-50">
+              Use this
+            </button>
+            <button onClick={() => setText(suggestion)} disabled={busy} className="btn btn-outline disabled:opacity-50">
+              Use &amp; edit
+            </button>
+            <button onClick={() => setDismissed(true)} className="btn-link btn-link-mut">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {templates.length > 0 && (
         <div className="mb-3">
-          <span className="field">MACROS</span>
+          <span className="field">Macros</span>
           <div className="flex flex-wrap gap-1.5">
             {templates.map((t) => (
               <button
@@ -114,46 +154,45 @@ export default function Actions({
           </div>
           {applied && (
             <p className="font-array text-[10.5px] text-[var(--olive)] mt-2">
-              DRAFT REPLACED WITH {applied.toUpperCase()} · EDIT IT BEFORE SENDING
+              {applied.toUpperCase()} LOADED INTO THE COMPOSER · EDIT IT BEFORE SENDING
             </p>
           )}
           {macroError && <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">{macroError}</p>}
         </div>
       )}
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        className="input-box h-40 text-[13.5px] leading-relaxed"
-      ></textarea>
-      <div className="flex gap-2 mt-3">
-        <button onClick={() => act("approve")} disabled={busy} className="btn disabled:opacity-50">
-          {busy ? "Working…" : "Approve & send"}
-        </button>
-        <button onClick={saveEdit} disabled={busy} className="btn btn-outline disabled:opacity-50">
-          Save edit
-        </button>
-        <button
-          onClick={() => act("reject")}
-          disabled={busy}
-          className="text-[var(--rust)] font-semibold text-[13px] px-3 py-2.5 hover:underline underline-offset-4 disabled:opacity-50"
-        >
-          Reject
-        </button>
-        <button
-          onClick={assignToMe}
-          disabled={busy || (!!assigned && assigned === (user?.email.split("@")[0] ?? ""))}
-          className="btn btn-outline ml-auto disabled:opacity-50"
-        >
-          {assigned
-            ? assigned === (user?.email.split("@")[0] ?? "")
-              ? `Assigned: ${assigned.toUpperCase()}`
-              : `Take over (now: ${assigned.toUpperCase()})`
-            : "Assign to me"}
-        </button>
-        <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive disabled:opacity-50">
-          Mark resolved
-        </button>
+
+      <div className="border border-[var(--line)] rounded-[10px] bg-white overflow-hidden">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Write a reply to the customer…"
+          className="w-full h-32 px-4 py-3 text-[13.5px] leading-relaxed bg-transparent outline-none resize-y"
+        />
+        <div className="flex flex-wrap gap-2 items-center px-3 py-2.5 border-t border-[var(--line)]">
+          <button onClick={send} disabled={busy || !text.trim()} className="btn disabled:opacity-40">
+            {busy ? "Working…" : "Send"}
+          </button>
+          <button onClick={() => act("reject")} disabled={busy} className="btn-link text-[var(--rust)]">
+            Reject
+          </button>
+          <button
+            onClick={assignToMe}
+            disabled={busy || (!!assigned && assigned === shortName)}
+            className="btn btn-outline ml-auto disabled:opacity-50"
+          >
+            {assigned
+              ? assigned === shortName
+                ? `Assigned: ${assigned.toUpperCase()}`
+                : `Take over (now: ${assigned.toUpperCase()})`
+              : "Assign to me"}
+          </button>
+          <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive disabled:opacity-50">
+            Mark resolved
+          </button>
+        </div>
       </div>
+      <p className="field mt-2">Nothing sends without you</p>
+
       {delivery && <p className="font-array text-[11px] text-[var(--olive)] mt-3">{delivery.toUpperCase()}</p>}
       {actError && <p className="font-array text-[11px] text-[var(--rust)] mt-3">{actError.toUpperCase()}</p>}
     </div>
