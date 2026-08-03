@@ -54,7 +54,7 @@ export default function PortalHome() {
                       className="block py-4 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:pl-3 transition-all"
                     >
                       <span className="block font-semibold text-[15.5px]">{r.subject}</span>
-                      <span className={`font-array text-[10.5px] ${st.tone}`}>
+                      <span className={`font-array text-[12px] ${st.tone}`}>
                         {st.text} · OPENED {new Date(r.created_at).toLocaleDateString()}
                       </span>
                     </Link>

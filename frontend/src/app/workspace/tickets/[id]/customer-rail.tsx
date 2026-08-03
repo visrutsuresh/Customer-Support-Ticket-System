@@ -37,8 +37,8 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[74px_1fr] gap-x-2 items-baseline py-[2px]">
-      <span className="font-array text-[10px] tracking-[0.1em] uppercase text-[var(--mut)]">{k}</span>
-      <span className="font-array text-[11.5px] text-[var(--ink)] break-words">{v}</span>
+      <span className="font-array text-[12px] tracking-[0.1em] uppercase text-[var(--mut)]">{k}</span>
+      <span className="font-array text-[12px] text-[var(--ink)] break-words">{v}</span>
     </div>
   );
 }
@@ -81,7 +81,7 @@ export default function CustomerRail({ id, tags }: { id: string; tags: React.Rea
         ) : (
           // an unknown sender is normal: email and Jira tickets arrive from people
           // who were never in the CRM, and that is worth stating rather than hiding
-          <p className="font-array text-[11px] text-[var(--mut)]">
+          <p className="font-array text-[12px] text-[var(--mut)]">
             {rec ? "NOT IN THE CUSTOMER RECORDS" : "LOADING…"}
           </p>
         )}
@@ -113,15 +113,15 @@ export default function CustomerRail({ id, tags }: { id: string; tags: React.Rea
         <Section label="Past tickets">
           {history.slice(0, 6).map((h) => (
             <div key={h.ticket_id} className="grid grid-cols-[74px_1fr] gap-x-2 items-baseline py-[2px]">
-              <span className="font-array text-[10px] tracking-[0.1em] uppercase text-[var(--mut)]">
+              <span className="font-array text-[12px] tracking-[0.1em] uppercase text-[var(--mut)]">
                 {h.lifecycle === "resolved" ? "Resolved" : "Open"}
               </span>
               {h.lifecycle === "resolved" ? (
-                <span className="font-array text-[11.5px] text-[var(--mut)]">{h.subject}</span>
+                <span className="font-array text-[12px] text-[var(--mut)]">{h.subject}</span>
               ) : (
                 <Link
                   href={`/workspace/tickets/${h.ticket_id}`}
-                  className="font-array text-[11.5px] text-[var(--ink)] hover:text-[var(--ox)] underline underline-offset-2"
+                  className="font-array text-[12px] text-[var(--ink)] hover:text-[var(--ox)] underline underline-offset-2"
                 >
                   {h.subject}
                 </Link>

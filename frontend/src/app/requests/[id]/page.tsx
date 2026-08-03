@@ -94,7 +94,7 @@ export default function RequestThread() {
     <PortalShell>
       {() => (
         <>
-          <Link href="/" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)]">
+          <Link href="/" className="font-array text-[12px] text-[var(--mut)] hover:text-[var(--ox)]">
             ← YOUR REQUESTS
           </Link>
           <h1 className="text-[24px] font-bold mt-2 mb-6 border-b border-[var(--ink)] pb-4">{subject || "Your request"}</h1>
@@ -104,7 +104,7 @@ export default function RequestThread() {
             <div className="space-y-6">
               {msgs.map((m, i) => (
                 <div key={i} className="rise" style={{ "--i": i } as React.CSSProperties}>
-                  <div className="font-array text-[10.5px] text-[var(--mut)] mb-1.5">
+                  <div className="font-array text-[12px] text-[var(--mut)] mb-1.5">
                     {m.role === "customer" ? "YOU" : "SUPPORT"}
                   </div>
                   <p
@@ -122,7 +122,7 @@ export default function RequestThread() {
           {working && (
             <div className="mt-8 max-w-[58ch]">
               <span className="workbar w-full" />
-              <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">
+              <p className="font-array text-[12px] text-[var(--mut)] mt-2">
                 WE ARE WORKING ON YOUR REQUEST. THIS USUALLY TAKES A MINUTE OR TWO.
               </p>
             </div>
@@ -146,7 +146,7 @@ export default function RequestThread() {
             </div>
           )}
           {sendError && (
-            <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">{sendError.toUpperCase()}</p>
+            <p className="font-array text-[12px] text-[var(--rust)] mt-2">{sendError.toUpperCase()}</p>
           )}
 
           {rating && (
@@ -171,7 +171,7 @@ export default function RequestThread() {
 
           {resolved && (
             <div className="mt-10">
-              <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THANKS FOR WRITING IN</p>
+              <p className="font-array text-[12px] text-[var(--olive)]">RESOLVED · THANKS FOR WRITING IN</p>
               <p className="text-[13.5px] text-[var(--mut)] mt-3 max-w-[52ch]">
                 Not what you needed? Reopen this request and it goes straight back to the team.
               </p>

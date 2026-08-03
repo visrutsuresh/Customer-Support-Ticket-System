@@ -98,7 +98,7 @@ export default function Queue() {
   return (
     <main className="max-w-[1600px] mx-auto px-10 py-9">
       {error && (
-        <p className="mb-3 font-array text-[11px] text-[var(--rust)]">
+        <p className="mb-3 font-array text-[12px] text-[var(--rust)]">
           CONNECTION TROUBLE · retrying, showing the last known queue
         </p>
       )}
@@ -108,7 +108,7 @@ export default function Queue() {
       >
         <h1 className="text-[26px] font-bold">The Queue</h1>
         {tickets && (
-          <span className="font-array text-[11px] text-[var(--mut)]">
+          <span className="font-array text-[12px] text-[var(--mut)]">
             {tickets.length} SHOWN ·{" "}
             {tickets.filter((t) => t.human_status === "pending").length} NEED
             REVIEW
@@ -142,7 +142,7 @@ export default function Queue() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="font-array text-[11px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
+          className="font-array text-[12px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
         >
           <option value="newest">NEWEST</option>
           <option value="oldest">OLDEST</option>
@@ -151,7 +151,7 @@ export default function Queue() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="font-array text-[11px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
+          className="font-array text-[12px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
         >
           <option value="">STATUS</option>
           <option value="pending">NEEDS REVIEW</option>
@@ -165,7 +165,7 @@ export default function Queue() {
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="font-array text-[11px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
+          className="font-array text-[12px] text-[var(--mut)] bg-transparent border-l border-[var(--line)] px-4 py-3 outline-none"
         >
           <option value="">CATEGORY</option>
           <option value="billing">BILLING</option>
@@ -209,7 +209,7 @@ export default function Queue() {
           {/* header row: same grid as the rows, so the dashes below it read as "empty", not broken */}
           <li
             aria-hidden
-            className="grid grid-cols-[92px_minmax(0,1fr)_136px_72px_64px_108px] 2xl:grid-cols-[92px_minmax(0,1fr)_110px_96px_136px_72px_64px_108px] gap-4 px-1 pt-3 pb-2 font-array text-[9.5px] tracking-[0.14em] text-[var(--mut)] border-b border-[var(--line)]"
+            className="grid grid-cols-[92px_minmax(0,1fr)_136px_72px_64px_108px] 2xl:grid-cols-[92px_minmax(0,1fr)_110px_96px_136px_72px_64px_108px] gap-4 px-1 pt-3 pb-2 font-array text-[12px] tracking-[0.14em] text-[var(--mut)] border-b border-[var(--line)]"
           >
             <span>SOURCE</span>
             <span>TICKET</span>
@@ -233,7 +233,7 @@ export default function Queue() {
                   href={`/workspace/tickets/${t.ticket_id}`}
                   className="row grid-cols-[92px_minmax(0,1fr)_136px_72px_64px_108px] 2xl:grid-cols-[92px_minmax(0,1fr)_110px_96px_136px_72px_64px_108px]"
                 >
-                  <span className="font-array text-[10.5px] text-[var(--mut)] leading-relaxed">
+                  <span className="font-array text-[12px] text-[var(--mut)] leading-relaxed">
                     {SOURCE_GLYPH[t.source ?? ""] ?? "▤"}{" "}
                     {(t.source ?? "?").toUpperCase()}
                     <br />
@@ -243,7 +243,7 @@ export default function Queue() {
                     <span className="flex items-center gap-2 min-w-0">
                       <span className="font-semibold text-[15.5px] truncate">{t.subject}</span>
                       {t.created_at && Date.now() - new Date(t.created_at).getTime() < 60_000 && (
-                        <span className="shrink-0 font-array text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--olive)] text-white">
+                        <span className="shrink-0 font-array text-[12px] px-1.5 py-0.5 rounded bg-[var(--olive)] text-white">
                           NEW
                         </span>
                       )}
@@ -254,14 +254,14 @@ export default function Queue() {
                       </span>
                     )}
                   </span>
-                  <span className="font-array text-[10.5px] text-[var(--mut)] truncate min-w-0 hidden 2xl:block">
+                  <span className="font-array text-[12px] text-[var(--mut)] truncate min-w-0 hidden 2xl:block">
                     {(t.tags ?? []).slice(0, 3).join(" · ").toUpperCase() || "—"}
                   </span>
                   <span className="badge truncate min-w-0 hidden 2xl:block">
                     {t.assignee ? t.assignee.toUpperCase() : "—"}
                   </span>
                   <span
-                    className={`font-array text-[11px] flex items-center gap-2 ${st.label === "NEEDS REVIEW" ? "text-[var(--ox)]" : st.label === "ERROR" || st.label === "REJECTED" ? "text-[var(--rust)]" : "text-[var(--mut)]"}`}
+                    className={`font-array text-[12px] flex items-center gap-2 ${st.label === "NEEDS REVIEW" ? "text-[var(--ox)]" : st.label === "ERROR" || st.label === "REJECTED" ? "text-[var(--rust)]" : "text-[var(--mut)]"}`}
                   >
                     <i
                       className={`w-[7px] h-[7px] rounded-full ${st.dot} ${st.pulse ? "animate-pulse" : ""}`}
@@ -277,7 +277,7 @@ export default function Queue() {
                   >
                     {(t.priority ?? "—").toUpperCase()}
                   </span>
-                  <span className="font-array text-[10.5px] text-[var(--mut)] tabular-nums">
+                  <span className="font-array text-[12px] text-[var(--mut)] tabular-nums">
                     {t.created_at
                       ? new Date(t.created_at)
                           .toLocaleDateString("en-GB", { day: "2-digit", month: "short" })

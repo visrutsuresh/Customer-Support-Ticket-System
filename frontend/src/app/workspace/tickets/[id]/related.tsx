@@ -55,10 +55,10 @@ export default function Related({
 
   return (
     <div className="border-t border-[var(--line)] mt-6 pt-4">
-      <span className="font-array text-[10.5px] text-[var(--mut)]">RELATED TICKETS</span>
+      <span className="font-array text-[12px] text-[var(--mut)]">RELATED TICKETS</span>
 
       {mergedInto && (
-        <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">
+        <p className="font-array text-[12px] text-[var(--rust)] mt-2">
           THIS TICKET WAS FOLDED INTO{" "}
           <Link href={`/workspace/tickets/${mergedInto}`} className="underline underline-offset-2">
             {mergedInto.toUpperCase()}
@@ -105,7 +105,7 @@ export default function Related({
           >
             {armed ? "Press again: this resolves that ticket" : "Fold that ticket into this one"}
           </button>
-          {error && <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">{error}</p>}
+          {error && <p className="font-array text-[12px] text-[var(--rust)] mt-2">{error}</p>}
         </>
       )}
     </div>

@@ -43,13 +43,13 @@ export default function Attachments({ id, locked }: { id: string; locked: boolea
 
   return (
     <div className="border-t border-[var(--line)] mt-6 pt-4">
-      <span className="font-array text-[10.5px] text-[var(--mut)]">ATTACHMENTS</span>
+      <span className="font-array text-[12px] text-[var(--mut)]">ATTACHMENTS</span>
 
       {files.length > 0 ? (
         <ul className="mt-2 space-y-1.5">
           {files.map((f) => (
             <li key={f.id} className="text-[12.5px] flex items-baseline gap-2">
-              <span className="font-array text-[10px] text-[var(--mut)] shrink-0">{kb(f.size)}</span>
+              <span className="font-array text-[12px] text-[var(--mut)] shrink-0">{kb(f.size)}</span>
               {/* a plain link, not a fetch: the session cookie is scoped to the host,
                   not the port, so the browser sends it to the API on :8000 by itself */}
               <a
@@ -80,10 +80,10 @@ export default function Attachments({ id, locked }: { id: string; locked: boolea
           >
             {busy ? "Uploading…" : "+ Attach a file"}
           </button>
-          <p className="font-array text-[10px] text-[var(--mut)] mt-1.5">
+          <p className="font-array text-[12px] text-[var(--mut)] mt-1.5">
             IMAGES, PDF, TXT OR CSV · 5 MB MAX
           </p>
-          {error && <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">{error}</p>}
+          {error && <p className="font-array text-[12px] text-[var(--rust)] mt-2">{error}</p>}
         </>
       )}
     </div>

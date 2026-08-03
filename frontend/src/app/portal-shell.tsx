@@ -34,7 +34,7 @@ export default function PortalShell({ children }: { children: (user: User) => Re
       <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
         <div className="text-center">
           <CloudMark size={52} className="mx-auto text-[var(--ox)] animate-pulse" />
-          <p className="font-array text-[10.5px] tracking-[0.2em] text-[var(--mut)] mt-3">
+          <p className="font-array text-[12px] tracking-[0.2em] text-[var(--mut)] mt-3">
             WAKING THE SERVICE UP · THIS CAN TAKE A MINUTE
           </p>
         </div>
@@ -51,7 +51,7 @@ export default function PortalShell({ children }: { children: (user: User) => Re
             <span className="block text-[20px] font-extrabold leading-none" style={{ fontFamily: "var(--font-cabinet)" }}>
               {brand.brand_name}
             </span>
-            <span className="font-array text-[9.5px] tracking-[0.2em] text-[var(--mut)]">HELP CENTRE</span>
+            <span className="font-array text-[12px] tracking-[0.2em] text-[var(--mut)]">HELP CENTRE</span>
           </span>
         </Link>
         <div className="ml-auto text-right text-[12.5px] text-[var(--mut)]">

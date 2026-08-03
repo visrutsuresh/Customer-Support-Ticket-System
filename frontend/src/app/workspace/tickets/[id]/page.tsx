@@ -144,15 +144,15 @@ export default function TicketDetail() {
     <main>
       {/* ---------- header: who, where from, and the machine's state at a glance ---------- */}
       <div className="px-8 py-4 border-b border-[var(--ink)] flex items-center gap-3.5 flex-wrap">
-        <Link href="/workspace" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)] shrink-0">
+        <Link href="/workspace" className="font-array text-[12px] text-[var(--mut)] hover:text-[var(--ox)] shrink-0">
           ← QUEUE
         </Link>
-        <span className="w-9 h-9 shrink-0 rounded-full grid place-items-center font-array text-[11px] font-bold bg-[var(--line)] text-[var(--ink)]">
+        <span className="w-9 h-9 shrink-0 rounded-full grid place-items-center font-array text-[12px] font-bold bg-[var(--line)] text-[var(--ink)]">
           {custInitials}
         </span>
         <div className="min-w-0">
           <h1 className="text-[19px] font-bold leading-tight truncate">{s.ticket.subject}</h1>
-          <div className="font-array text-[10.5px] text-[var(--mut)] flex flex-wrap gap-x-3">
+          <div className="font-array text-[12px] text-[var(--mut)] flex flex-wrap gap-x-3">
             <span>{(s.ticket.customer_name ?? "unknown sender").toUpperCase()}</span>
             {s.ticket.customer_email && <span>{s.ticket.customer_email.toUpperCase()}</span>}
             <span>{id.toUpperCase()}</span>
@@ -167,20 +167,20 @@ export default function TicketDetail() {
         {/* pills right-align as one group and wrap as a unit, never under the back link */}
         <div className="ml-auto shrink-0 flex items-center gap-2">
           {s.decision.assignee?.name && (
-            <span className="font-array text-[10px] text-[var(--mut)]">
+            <span className="font-array text-[12px] text-[var(--mut)]">
               ASSIGNED {s.decision.assignee.name.toUpperCase()}
             </span>
           )}
-          <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink)]">
+          <span className="font-array text-[12px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink)]">
             {channel ? `✉ ${s.ticket.source.toUpperCase()}` : (s.ticket.source ?? "—").toUpperCase()}
           </span>
           {autoHandled && (
-            <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--olive)] text-[var(--paper)]">
+            <span className="font-array text-[12px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--olive)] text-[var(--paper)]">
               ⚡ AUTO-HANDLED
             </span>
           )}
           {escalated && (
-            <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--rust)] text-[var(--paper)]">
+            <span className="font-array text-[12px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--rust)] text-[var(--paper)]">
               ✋ HELD FOR REVIEW
             </span>
           )}
@@ -192,7 +192,7 @@ export default function TicketDetail() {
         <section className="px-7 py-6 min-h-[70vh]">
           <div className="max-w-[780px] mx-auto flex flex-col gap-4">
             {channel && (
-              <p className="self-center max-w-[80%] text-center font-array text-[10px] tracking-[0.12em] text-[#6b5a2a] bg-[#f6ecd2] border border-dashed border-[#d9c58a] rounded-[10px] px-4 py-2">
+              <p className="self-center max-w-[80%] text-center font-array text-[12px] tracking-[0.12em] text-[#6b5a2a] bg-[#f6ecd2] border border-dashed border-[#d9c58a] rounded-[10px] px-4 py-2">
                 THIS CONVERSATION ARRIVED VIA {s.ticket.source.toUpperCase()}. REPLIES GO BACK THE SAME WAY.
               </p>
             )}
@@ -203,7 +203,7 @@ export default function TicketDetail() {
                 // bubble: it sits between them as a system line the customer never sees
                 return (
                   <div key={i} className="self-center max-w-[80%]">
-                    <p className="font-array text-[10px] tracking-[0.14em] text-[var(--mut)] bg-[var(--paper-2)] border border-dashed border-[var(--line)] rounded-full px-3.5 py-1.5">
+                    <p className="font-array text-[12px] tracking-[0.14em] text-[var(--mut)] bg-[var(--paper-2)] border border-dashed border-[var(--line)] rounded-full px-3.5 py-1.5">
                       INTERNAL NOTE · {m.body.toUpperCase()}
                     </p>
                   </div>
@@ -215,14 +215,14 @@ export default function TicketDetail() {
                   {/* the verdict happened between their first message and whatever followed */}
                   {i === verdictAt && verdictLine && (
                     <p className="text-center mb-4">
-                      <span className="font-array text-[10px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
+                      <span className="font-array text-[12px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
                         {verdictLine.toUpperCase()}
                       </span>
                     </p>
                   )}
                   <div className={`flex gap-2.5 items-end ${mine ? "flex-row-reverse" : ""}`}>
                     <span
-                      className={`w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[10px] ${
+                      className={`w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[12px] ${
                         mine ? "bg-[var(--ox)] text-[var(--paper)]" : "bg-[var(--line)] text-[var(--ink)]"
                       }`}
                     >
@@ -238,7 +238,7 @@ export default function TicketDetail() {
                       >
                         {m.body}
                       </div>
-                      <span className="block font-array text-[9.5px] tracking-[0.12em] text-[var(--mut)] mt-1 px-1">
+                      <span className="block font-array text-[12px] tracking-[0.12em] text-[var(--mut)] mt-1 px-1">
                         {mine
                           ? `NIMBUS SUPPORT${channel ? ` · SENT VIA ${channel.toUpperCase()}` : ""}${
                               autoHandled && i === verdictAt ? " · ⚡ AUTO-SENT" : ""
@@ -254,7 +254,7 @@ export default function TicketDetail() {
             {/* no non-internal turn after the opener yet: the verdict line still needs a home */}
             {verdictAt === -1 && verdictLine && (
               <p className="text-center">
-                <span className="font-array text-[10px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
+                <span className="font-array text-[12px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
                   {verdictLine.toUpperCase()}
                 </span>
               </p>
@@ -263,7 +263,7 @@ export default function TicketDetail() {
             {/* the pipeline is mid-flight: the messaging-app equivalent of "typing…" */}
             {s.human_status === "processing" && (
               <div className="flex gap-2.5 items-end">
-                <span className="w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[10px] bg-[var(--ox)] text-[var(--paper)]">
+                <span className="w-7 h-7 shrink-0 rounded-full grid place-items-center font-array text-[12px] bg-[var(--ox)] text-[var(--paper)]">
                   NS
                 </span>
                 <div className="bg-white border border-[var(--line)] rounded-2xl rounded-bl-[5px] px-4 py-3 flex gap-1.5">
@@ -293,7 +293,7 @@ export default function TicketDetail() {
 
             {locked ? (
               <div>
-                <p className="font-array text-[11px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
+                <p className="font-array text-[12px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
                 <button onClick={reopen} className={`btn mt-3 ${reopenArmed ? "btn-armed" : "btn-quiet"}`}>
                   {reopenArmed ? "Press again to confirm reopen" : "Reopen ticket"}
                 </button>
@@ -320,7 +320,7 @@ export default function TicketDetail() {
           <span className="field">The machine&apos;s verdict</span>
           <div className="flex items-center gap-2.5">
             <span
-              className={`font-array text-[10px] tracking-[0.14em] px-2.5 py-1 rounded-[3px] text-[var(--paper)] ${
+              className={`font-array text-[12px] tracking-[0.14em] px-2.5 py-1 rounded-[3px] text-[var(--paper)] ${
                 escalated ? "bg-[var(--rust)]" : "bg-[var(--olive)]"
               }`}
             >
@@ -336,7 +336,7 @@ export default function TicketDetail() {
             )}
           </div>
           {s.decision.reason && (
-            <p className="font-array text-[10.5px] text-[var(--mut)] mt-2">GROUNDS: {s.decision.reason.toUpperCase()}</p>
+            <p className="font-array text-[12px] text-[var(--mut)] mt-2">GROUNDS: {s.decision.reason.toUpperCase()}</p>
           )}
 
           <div className="mt-4">

@@ -78,7 +78,7 @@ function Tile({
         {label}
         {badge && <Badge kind={badge} />}
       </div>
-      {sub && <div className="mt-1 font-array text-[10px] text-[var(--mut)] leading-relaxed">{sub}</div>}
+      {sub && <div className="mt-1 font-array text-[12px] text-[var(--mut)] leading-relaxed">{sub}</div>}
     </div>
   );
 }
@@ -103,7 +103,7 @@ export default function PerformanceDashboard() {
     <main className="max-w-5xl px-10 py-9">
       <div className="border-b border-[var(--ink)] pb-4">
         <h1 className="text-[28px] font-bold leading-tight">Performance</h1>
-        <p className="font-array text-[11px] text-[var(--mut)] mt-2">
+        <p className="font-array text-[12px] text-[var(--mut)] mt-2">
           LIVE FIGURES FROM RESOLVED TICKETS · REFRESHED EVERY 15S
         </p>
       </div>

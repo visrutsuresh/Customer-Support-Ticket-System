@@ -184,7 +184,7 @@ h3 {
 .field {
   display: block;
   font-family: var(--font-array), monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--mut);
@@ -194,7 +194,7 @@ h3 {
 /* status / severity marks */
 .badge {
   font-family: var(--font-array), monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.03em;
   color: var(--mut);
 }
@@ -218,7 +218,7 @@ h3 {
 /* small bordered token: tags, filter switches */
 .chip {
   font-family: var(--font-array), monospace;
-  font-size: 11px;
+  font-size: 12px;
   border: 1px solid var(--line);
   border-radius: 3px;
   padding: 4px 10px;

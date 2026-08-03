@@ -128,7 +128,7 @@ export default function Actions({
           <div className="flex items-center gap-2">
             <span className="field !mb-0 !text-[var(--rust)]">Draft · waiting on you · not sent</span>
             {typeof confidence === "number" && (
-              <span className="font-array text-[10.5px] text-[var(--mut)] ml-auto">{confidence}</span>
+              <span className="font-array text-[12px] text-[var(--mut)] ml-auto">{confidence}</span>
             )}
           </div>
           <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap mt-2 max-w-[68ch]">{suggestion}</p>
@@ -162,11 +162,11 @@ export default function Actions({
             ))}
           </div>
           {applied && (
-            <p className="font-array text-[10.5px] text-[var(--olive)] mt-2">
+            <p className="font-array text-[12px] text-[var(--olive)] mt-2">
               {applied.toUpperCase()} LOADED INTO THE COMPOSER · EDIT IT BEFORE SENDING
             </p>
           )}
-          {macroError && <p className="font-array text-[10.5px] text-[var(--rust)] mt-2">{macroError}</p>}
+          {macroError && <p className="font-array text-[12px] text-[var(--rust)] mt-2">{macroError}</p>}
         </div>
       )}
 
@@ -208,8 +208,8 @@ export default function Actions({
             : "Nothing sends without you"}
       </p>
 
-      {delivery && <p className="font-array text-[11px] text-[var(--olive)] mt-3">{delivery.toUpperCase()}</p>}
-      {actError && <p className="font-array text-[11px] text-[var(--rust)] mt-3">{actError.toUpperCase()}</p>}
+      {delivery && <p className="font-array text-[12px] text-[var(--olive)] mt-3">{delivery.toUpperCase()}</p>}
+      {actError && <p className="font-array text-[12px] text-[var(--rust)] mt-3">{actError.toUpperCase()}</p>}
     </div>
   );
 }

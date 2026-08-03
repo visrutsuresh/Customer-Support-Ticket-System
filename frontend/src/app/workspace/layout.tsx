@@ -51,7 +51,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   if (!user || user.role === "customer") {
     return (
       <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
-        <p className="font-array text-[10.5px] tracking-[0.2em] text-[var(--mut)] animate-pulse">
+        <p className="font-array text-[12px] tracking-[0.2em] text-[var(--mut)] animate-pulse">
           WAKING THE SERVICE UP · THIS CAN TAKE A MINUTE
         </p>
       </main>
@@ -86,7 +86,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           <div className="text-[27px] font-extrabold leading-none" style={{ fontFamily: "var(--font-cabinet)" }}>
             {brand}
           </div>
-          <div className="font-array text-[10px] tracking-[0.22em] text-[var(--mut)] mt-1">SUPPORT REGISTRY</div>
+          <div className="font-array text-[12px] tracking-[0.22em] text-[var(--mut)] mt-1">SUPPORT REGISTRY</div>
         </div>
 
         <nav className="mt-10 flex flex-col gap-1">
@@ -107,7 +107,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         </nav>
 
         <div className="mt-auto pr-4">
-          {syncNote && <div className="font-array text-[10.5px] text-[var(--mut)] mb-3">{syncNote}</div>}
+          {syncNote && <div className="font-array text-[12px] text-[var(--mut)] mb-3">{syncNote}</div>}
           <div className="text-[13.5px] font-medium text-[var(--ink)] break-all">{user.email}</div>
           <button
             onClick={signOut}
