@@ -30,7 +30,7 @@ export default function Actions({
 }) {
   const router = useRouter();
   const [text, setText] = useState(""); // the composer starts EMPTY, by design
-  const [mode, setMode] = useState<"reply" | "note">("reply"); // C2: tabs decide what the box IS
+  const [mode, setMode] = useState<"reply" | "note" | "macros">("reply"); // C2: tabs decide what the box IS
   const [noteText, setNoteText] = useState("");
   const [dismissed, setDismissed] = useState(false);
   const [delivery, setDelivery] = useState("");
@@ -78,6 +78,7 @@ export default function Actions({
       });
       setText(out.reply); // a macro is something you are about to send, so it lands in the composer
       setApplied(out.applied_template);
+      setMode("reply"); // picking a macro means you are about to edit and send it
     } catch (e) {
       setMacroError(`That macro did not apply: ${e}`);
     }
@@ -186,6 +187,16 @@ export default function Actions({
           >
             Internal note
           </button>
+          {templates.length > 0 && (
+            <button
+              onClick={() => setMode("macros")}
+              className={`px-4 py-2 text-[12.5px] font-semibold border-r border-[var(--line)] ${
+                mode === "macros" ? "bg-white text-[var(--ink)] shadow-[inset_0_-2px_0_var(--ox)]" : "text-[var(--mut)]"
+              }`}
+            >
+              Macros
+            </button>
+          )}
         </div>
 
         {noteMode ? (
@@ -203,29 +214,30 @@ export default function Actions({
               <span className="font-array text-[12px] text-[#a08c55] ml-auto">CUSTOMERS NEVER SEE NOTES</span>
             </div>
           </>
+        ) : mode === "macros" ? (
+          <div className="bg-white px-4 py-4">
+            <span className="field">Pick a macro · it loads into the reply box for editing</span>
+            <div className="flex flex-wrap gap-1.5">
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => applyTemplate(t.id)}
+                  title={t.category ? `${t.name} · ${t.category}` : t.name}
+                  className={`chip ${applied === t.name ? "chip-on" : ""}`}
+                >
+                  {t.name.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            {macroError && <p className="font-array text-[12px] text-[var(--rust)] mt-2">{macroError}</p>}
+          </div>
         ) : (
           <>
-            {templates.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 items-center px-4 pt-3">
-                <span className="field !mb-0">Macros</span>
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => applyTemplate(t.id)}
-                    title={t.category ? `${t.name} · ${t.category}` : t.name}
-                    className={`chip ${applied === t.name ? "chip-on" : ""}`}
-                  >
-                    {t.name.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            )}
             {applied && (
               <p className="font-array text-[12px] text-[var(--olive)] px-4 pt-2">
                 {applied.toUpperCase()} LOADED INTO THE COMPOSER · EDIT IT BEFORE SENDING
               </p>
             )}
-            {macroError && <p className="font-array text-[12px] text-[var(--rust)] px-4 pt-2">{macroError}</p>}
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
