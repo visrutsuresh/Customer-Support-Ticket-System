@@ -29,16 +29,34 @@ export function useUser() {
       if (cached) setUser(cached);
     } catch {}
     setReady(true);
-    api("/users/me")
-      .then((u) => {
-        setUser(u);
-        cacheUser(u);
-      })
-      .catch(() => {
-        setUser(null);
-        cacheUser(null);
-      })
-      .finally(() => setLoading(false));
+    let dead = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      api("/users/me")
+        .then((u) => {
+          if (dead) return;
+          setUser(u);
+          cacheUser(u);
+          setLoading(false);
+        })
+        .catch((e) => {
+          if (dead) return;
+          if (String(e instanceof Error ? e.message : e).startsWith("401")) {
+            // a real "who are you": the session is genuinely gone
+            setUser(null);
+            cacheUser(null);
+            setLoading(false);
+          } else {
+            // backend asleep or mid-deploy: that is not a sign-out, retry until it answers
+            timer = setTimeout(check, 6000);
+          }
+        });
+    };
+    check();
+    return () => {
+      dead = true;
+      clearTimeout(timer);
+    };
   }, []);
   return { user, loading, ready };
 }
