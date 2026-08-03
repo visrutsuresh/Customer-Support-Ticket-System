@@ -42,7 +42,6 @@ export default function TicketDetail() {
   const router = useRouter();
   const [s, setS] = useState<State | null>(null);
   const [error, setError] = useState("");
-  const [note, setNote] = useState("");
   const [newTag, setNewTag] = useState("");
   const [reopenArmed, setReopenArmed] = useState(false);
 
@@ -73,10 +72,8 @@ export default function TicketDetail() {
     router.replace(`/workspace/tickets/${out.ticket_id}`);
   }
 
-  async function addNote() {
-    if (!note.trim()) return;
-    await api(`/tickets/${id}/note`, { method: "POST", body: JSON.stringify({ body: note }) });
-    setNote("");
+  async function addNote(body: string) {
+    await api(`/tickets/${id}/note`, { method: "POST", body: JSON.stringify({ body }) });
     load();
   }
 
@@ -276,21 +273,6 @@ export default function TicketDetail() {
           </div>
 
           <div className="max-w-[780px] mx-auto mt-6">
-            {!locked && (
-              <div className="flex gap-2 mb-4">
-                <input
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && addNote()}
-                  placeholder="Add an internal note (customers never see these)"
-                  className="input flex-1 text-[13.5px]"
-                />
-                <button onClick={addNote} className="btn btn-outline">
-                  Note
-                </button>
-              </div>
-            )}
-
             {locked ? (
               <div>
                 <p className="font-array text-[12px] text-[var(--olive)]">RESOLVED · THIS TICKET IS LOCKED</p>
@@ -307,6 +289,7 @@ export default function TicketDetail() {
                 escalated={escalated}
                 channel={channel}
                 customerEmail={s.ticket.customer_email}
+                onNote={addNote}
               />
             )}
           </div>

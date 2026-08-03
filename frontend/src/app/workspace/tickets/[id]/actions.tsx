@@ -17,6 +17,7 @@ export default function Actions({
   escalated = false,
   channel = "",
   customerEmail,
+  onNote,
 }: {
   id: string;
   reply: string;
@@ -25,9 +26,12 @@ export default function Actions({
   escalated?: boolean; // the draft card only exists when the machine held back
   channel?: string; // "email" | "Jira" | "Zendesk" | "" (in-app)
   customerEmail?: string | null;
+  onNote?: (body: string) => Promise<void>; // saving an internal note, owned by the page
 }) {
   const router = useRouter();
   const [text, setText] = useState(""); // the composer starts EMPTY, by design
+  const [mode, setMode] = useState<"reply" | "note">("reply"); // C2: tabs decide what the box IS
+  const [noteText, setNoteText] = useState("");
   const [dismissed, setDismissed] = useState(false);
   const [delivery, setDelivery] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -116,10 +120,27 @@ export default function Actions({
     }
   }
 
+  async function saveNote() {
+    const body = noteText.trim();
+    if (!body || busy || !onNote) return;
+    setBusy(true);
+    setActError("");
+    try {
+      await onNote(body);
+      setNoteText("");
+      setMode("reply");
+    } catch (e) {
+      setActError(`Note failed: ${e}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // auto-send means the machine already sent it: showing a draft then would be a lie.
   // The card exists only while the machine has held back and is waiting on a human.
   const showSuggestion = escalated && !!suggestion.trim() && !dismissed;
   const sendLabel = channel === "email" ? "Send as email ✉" : channel ? `Send as ${channel} comment` : "Send";
+  const noteMode = mode === "note";
 
   return (
     <div>
@@ -146,59 +167,95 @@ export default function Actions({
         </div>
       )}
 
-      {templates.length > 0 && (
-        <div className="mb-3">
-          <span className="field">Macros</span>
-          <div className="flex flex-wrap gap-1.5">
-            {templates.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => applyTemplate(t.id)}
-                title={t.category ? `${t.name} · ${t.category}` : t.name}
-                className={`chip ${applied === t.name ? "chip-on" : ""}`}
-              >
-                {t.name.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          {applied && (
-            <p className="font-array text-[12px] text-[var(--olive)] mt-2">
-              {applied.toUpperCase()} LOADED INTO THE COMPOSER · EDIT IT BEFORE SENDING
-            </p>
-          )}
-          {macroError && <p className="font-array text-[12px] text-[var(--rust)] mt-2">{macroError}</p>}
-        </div>
-      )}
-
-      <div className="border border-[var(--line)] rounded-[10px] bg-white overflow-hidden">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={escalated ? "Or write your own reply…" : "Add to the conversation…"}
-          className="w-full h-32 px-4 py-3 text-[13.5px] leading-relaxed bg-transparent outline-none resize-y"
-        />
-        <div className="flex flex-wrap gap-2 items-center px-4 py-2.5 border-t border-[var(--line)]">
-          <button onClick={send} disabled={busy || !text.trim()} className="btn disabled:opacity-40">
-            {busy ? "Working…" : sendLabel}
-          </button>
-          <button onClick={() => act("reject")} disabled={busy} className="btn-link text-[var(--rust)]">
-            Reject
+      {/* C2: one box, tabs decide what it IS. Reply = white with macros; note = amber. */}
+      <div className={`border rounded-[10px] overflow-hidden ${noteMode ? "border-[#d9c58a]" : "border-[var(--line)]"}`}>
+        <div className="flex items-stretch border-b border-[var(--line)] bg-[var(--paper-2)]">
+          <button
+            onClick={() => setMode("reply")}
+            className={`px-4 py-2 text-[12.5px] font-semibold border-r border-[var(--line)] ${
+              !noteMode ? "bg-white text-[var(--ink)] shadow-[inset_0_-2px_0_var(--ox)]" : "text-[var(--mut)]"
+            }`}
+          >
+            Reply to customer
           </button>
           <button
-            onClick={assignToMe}
-            disabled={busy || (!!assigned && assigned === shortName)}
-            className="btn btn-outline ml-auto disabled:opacity-50"
+            onClick={() => setMode("note")}
+            className={`px-4 py-2 text-[12.5px] font-semibold border-r border-[var(--line)] ${
+              noteMode ? "bg-[#f6ecd2] text-[#6b5a2a] shadow-[inset_0_-2px_0_#b98a2f]" : "text-[var(--mut)]"
+            }`}
           >
-            {assigned
-              ? assigned === shortName
-                ? `Assigned: ${assigned.toUpperCase()}`
-                : `Take over (now: ${assigned.toUpperCase()})`
-              : "Assign to me"}
-          </button>
-          <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive disabled:opacity-50">
-            Mark resolved
+            Internal note
           </button>
         </div>
+
+        {noteMode ? (
+          <>
+            <textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add an internal note (customers never see these)…"
+              className="w-full h-24 px-4 py-3 text-[13.5px] leading-relaxed bg-[#f6ecd2] outline-none resize-y placeholder:text-[#a08c55]"
+            />
+            <div className="flex flex-wrap gap-2 items-center px-4 py-2.5 border-t border-[#d9c58a] bg-[#f6ecd2]">
+              <button onClick={saveNote} disabled={busy || !noteText.trim()} className="btn disabled:opacity-40">
+                {busy ? "Working…" : "Save note"}
+              </button>
+              <span className="font-array text-[12px] text-[#a08c55] ml-auto">CUSTOMERS NEVER SEE NOTES</span>
+            </div>
+          </>
+        ) : (
+          <>
+            {templates.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 items-center px-4 pt-3">
+                <span className="field !mb-0">Macros</span>
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => applyTemplate(t.id)}
+                    title={t.category ? `${t.name} · ${t.category}` : t.name}
+                    className={`chip ${applied === t.name ? "chip-on" : ""}`}
+                  >
+                    {t.name.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
+            {applied && (
+              <p className="font-array text-[12px] text-[var(--olive)] px-4 pt-2">
+                {applied.toUpperCase()} LOADED INTO THE COMPOSER · EDIT IT BEFORE SENDING
+              </p>
+            )}
+            {macroError && <p className="font-array text-[12px] text-[var(--rust)] px-4 pt-2">{macroError}</p>}
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={escalated ? "Or write your own reply…" : "Add to the conversation…"}
+              className="w-full h-28 px-4 py-3 text-[13.5px] leading-relaxed bg-transparent outline-none resize-y"
+            />
+            <div className="flex flex-wrap gap-2 items-center px-4 py-2.5 border-t border-[var(--line)]">
+              <button onClick={send} disabled={busy || !text.trim()} className="btn disabled:opacity-40">
+                {busy ? "Working…" : sendLabel}
+              </button>
+              <button onClick={() => act("reject")} disabled={busy} className="btn-link text-[var(--rust)]">
+                Reject
+              </button>
+              <button
+                onClick={assignToMe}
+                disabled={busy || (!!assigned && assigned === shortName)}
+                className="btn btn-outline ml-auto disabled:opacity-50"
+              >
+                {assigned
+                  ? assigned === shortName
+                    ? `Assigned: ${assigned.toUpperCase()}`
+                    : `Take over (now: ${assigned.toUpperCase()})`
+                  : "Assign to me"}
+              </button>
+              <button onClick={() => act("resolve")} disabled={busy} className="btn btn-olive disabled:opacity-50">
+                Mark resolved
+              </button>
+            </div>
+          </>
+        )}
       </div>
       <p className="field mt-2">
         {channel === "email" && customerEmail
