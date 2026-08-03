@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { CloudMark } from "@/lib/icons";
 import { logout, useUser, type User } from "@/lib/useUser";
 
 export default function PortalShell({ children }: { children: (user: User) => React.ReactNode }) {
@@ -31,7 +32,7 @@ export default function PortalShell({ children }: { children: (user: User) => Re
     return (
       <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
         <div className="text-center">
-          <span className="inline-block w-9 h-9 bg-[var(--ox)] text-[var(--paper)] leading-9 text-lg rounded-[3px] animate-pulse">雲</span>
+          <CloudMark size={52} className="mx-auto text-[var(--ox)] animate-pulse" />
           <p className="font-array text-[10.5px] tracking-[0.2em] text-[var(--mut)] mt-3">
             WAKING THE SERVICE UP · THIS CAN TAKE A MINUTE
           </p>
@@ -44,7 +45,7 @@ export default function PortalShell({ children }: { children: (user: User) => Re
     <div className="min-h-[100dvh] bg-[var(--paper)]">
       <header className="max-w-2xl mx-auto px-6 pt-10 pb-6 flex items-start">
         <Link href="/" className="flex items-center gap-3">
-          <span className="w-9 h-9 bg-[var(--ox)] text-[var(--paper)] flex items-center justify-center text-lg rounded-[3px]">雲</span>
+          <CloudMark size={38} className="text-[var(--ox)] shrink-0" />
           <span>
             <span className="block text-[20px] font-extrabold leading-none" style={{ fontFamily: "var(--font-cabinet)" }}>
               {brand.brand_name}

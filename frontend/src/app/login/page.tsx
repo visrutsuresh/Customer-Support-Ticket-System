@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { EyeIcon } from "@/lib/icons";
+import { CloudMark, EyeIcon } from "@/lib/icons";
 import { login, register } from "@/lib/useUser";
 
 export default function LoginPage() {
@@ -35,13 +35,7 @@ export default function LoginPage() {
     <main className="min-h-[100dvh] bg-[var(--paper)] text-[var(--ink)] flex items-center justify-center px-4">
       <form onSubmit={submit} className="card w-full max-w-sm">
         <div className="mb-8">
-          <div className="w-10 h-10 bg-[var(--ox)] text-[var(--paper)] flex items-center justify-center rounded-[3px] mb-3">
-            <svg viewBox="0 0 24 18" width="26" height="20" fill="currentColor" aria-label="Nimbus cloud mark">
-              <path d="M6.2 14.8c-2.1 0-3.6-1.4-3.6-3.2 0-1.5 1-2.7 2.4-3.1-.1-2.2 1.6-4 3.8-4 1.4 0 2.6.7 3.3 1.8.6-1.6 2.1-2.7 3.9-2.7 2.3 0 4.2 1.8 4.2 4.1 0 .3 0 .6-.1.9 1.2.5 2 1.6 2 3 0 1.8-1.5 3.2-3.4 3.2z" />
-              <circle cx="12.6" cy="10.6" r="2.5" fill="var(--ox)" />
-              <path d="M12.6 8.1a2.5 2.5 0 0 1 2.5 2.5" stroke="currentColor" strokeWidth="1.1" fill="none" />
-            </svg>
-          </div>
+          <CloudMark size={46} className="text-[var(--ox)] mb-3" />
           <h1 className="text-2xl font-bold">{mode === "signin" ? "Sign in" : "Create your account"}</h1>
           <p className="text-sm text-[var(--mut)] mt-1">
             {mode === "signin" ? "Nimbus support desk" : "Track your requests in one place"}
