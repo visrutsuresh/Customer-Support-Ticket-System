@@ -8,16 +8,39 @@ export type User = {
   role: "customer" | "staff" | "admin";
 };
 
+const CACHE = "nimbus-user";
+
+export function cacheUser(u: User | null) {
+  try {
+    if (u) localStorage.setItem(CACHE, JSON.stringify(u));
+    else localStorage.removeItem(CACHE);
+  } catch {}
+}
+
 export function useUser() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false); // the cache has been consulted
   useEffect(() => {
+    // the last known sign-in renders the app instantly; /users/me reconciles in the
+    // background once the free-tier backend wakes, instead of blocking the page on it
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE) || "null");
+      if (cached) setUser(cached);
+    } catch {}
+    setReady(true);
     api("/users/me")
-      .then(setUser)
-      .catch(() => setUser(null))
+      .then((u) => {
+        setUser(u);
+        cacheUser(u);
+      })
+      .catch(() => {
+        setUser(null);
+        cacheUser(null);
+      })
       .finally(() => setLoading(false));
   }, []);
-  return { user, loading };
+  return { user, loading, ready };
 }
 
 export async function login(email: string, password: string) {
@@ -40,5 +63,6 @@ export async function register(email: string, password: string) {
 }
 
 export async function logout() {
+  cacheUser(null);
   await api("/auth/logout", { method: "POST" });
 }

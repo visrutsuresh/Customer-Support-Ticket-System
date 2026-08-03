@@ -7,15 +7,17 @@ import { CloudMark } from "@/lib/icons";
 import { logout, useUser, type User } from "@/lib/useUser";
 
 export default function PortalShell({ children }: { children: (user: User) => React.ReactNode }) {
-  const { user, loading } = useUser();
+  const { user, ready } = useUser();
   const router = useRouter();
   const [brand, setBrand] = useState({ brand_name: "Nimbus", brand_tagline: "" });
 
   useEffect(() => {
-    if (loading) return;
+    if (!ready) return;
+    // nobody cached: go straight to login, which renders instantly and fires the
+    // prewarm, rather than parking the visitor on a blocker while the backend wakes
     if (!user) router.replace("/login");
     else if (user.role !== "customer") router.replace("/workspace");
-  }, [user, loading, router]);
+  }, [user, ready, router]);
 
   useEffect(() => {
     api("/config").then(setBrand).catch(() => {});
@@ -26,9 +28,8 @@ export default function PortalShell({ children }: { children: (user: User) => Re
     router.replace("/login");
   }
 
-  if (loading || !user || user.role !== "customer") {
-    // never a silent blank page: the free-tier backend can take up to a minute
-    // to wake from sleep, and this is what the visitor stares at meanwhile
+  if (!user || user.role !== "customer") {
+    // seen only for the instant before the redirect to /login lands
     return (
       <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
         <div className="text-center">

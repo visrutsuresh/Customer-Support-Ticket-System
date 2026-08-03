@@ -6,17 +6,18 @@ import { api } from "@/lib/api";
 import { logout, useUser } from "@/lib/useUser";
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useUser();
+  const { user, ready } = useUser();
   const router = useRouter();
   const pathname = usePathname();
   const [brand, setBrand] = useState("Nimbus");
   const [syncNote, setSyncNote] = useState("");
 
   useEffect(() => {
-    if (loading) return;
+    if (!ready) return;
+    // nobody cached: straight to login (instant render + prewarm) instead of a blocker
     if (!user) router.replace("/login");
     else if (user.role === "customer") router.replace("/");
-  }, [user, loading, router]);
+  }, [user, ready, router]);
 
   useEffect(() => {
     api("/config").then((c) => setBrand(c.brand_name)).catch(() => {});
@@ -47,7 +48,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     router.replace("/login");
   }
 
-  if (loading || !user || user.role === "customer") {
+  if (!user || user.role === "customer") {
     return (
       <main className="min-h-[100dvh] bg-[var(--paper)] flex items-center justify-center">
         <p className="font-array text-[10.5px] tracking-[0.2em] text-[var(--mut)] animate-pulse">

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { CloudMark, EyeIcon } from "@/lib/icons";
-import { login, register } from "@/lib/useUser";
+import { cacheUser, login, register } from "@/lib/useUser";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,6 +30,7 @@ export default function LoginPage() {
       if (mode === "signup") await register(email, password);
       await login(email, password);
       const me = await api("/users/me");
+      cacheUser(me); // the next visit renders the app from this instantly
       router.push(me.role === "customer" ? "/" : "/workspace");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
