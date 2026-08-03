@@ -97,8 +97,10 @@ export default function TicketDetail() {
 
   const conf = s.decision.confidence ?? s.draft.confidence;
   const locked = s.lifecycle === "resolved";
-  const escalated = s.decision.action === "escalate";
-  const autoHandled = s.decision.action === "auto_send";
+  // autonomous mode returns raw model casing ("Escalate"): normalise before comparing
+  const action = (s.decision.action ?? "").toLowerCase();
+  const escalated = action === "escalate";
+  const autoHandled = action === "auto_send";
   const channel = returnChannel(s.ticket.source);
   const messages = s.messages ?? [{ role: "customer", body: s.ticket.body }];
   const custInitials = initials(s.ticket.customer_name, s.ticket.customer_email);
