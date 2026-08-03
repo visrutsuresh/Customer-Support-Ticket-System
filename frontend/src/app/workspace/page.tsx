@@ -96,7 +96,7 @@ export default function Queue() {
   }, [q, status, category, scope, sort]);
 
   return (
-    <main className="max-w-5xl px-10 py-9">
+    <main className="max-w-[1600px] mx-auto px-10 py-9">
       {error && (
         <p className="mb-3 font-array text-[11px] text-[var(--rust)]">
           CONNECTION TROUBLE · retrying, showing the last known queue
@@ -180,10 +180,18 @@ export default function Queue() {
       {!tickets ? (
         <div aria-hidden className="divide-y divide-[var(--line)]">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse flex items-center gap-4 py-4">
+            // same template as the real rows, so data landing causes no reflow jump
+            <div
+              key={i}
+              className="animate-pulse grid grid-cols-[92px_minmax(0,1fr)_136px_72px_64px_108px] 2xl:grid-cols-[92px_minmax(0,1fr)_110px_96px_136px_72px_64px_108px] gap-4 px-1 py-4 items-center"
+            >
+              <span className="h-3 w-14 rounded bg-[var(--line)]" />
+              <span className="h-3 max-w-md rounded bg-[var(--line)]" />
+              <span className="h-3 w-16 rounded bg-[var(--line)] hidden 2xl:block" />
+              <span className="h-3 w-14 rounded bg-[var(--line)] hidden 2xl:block" />
+              <span className="h-3 w-20 rounded bg-[var(--line)]" />
               <span className="h-3 w-10 rounded bg-[var(--line)]" />
-              <span className="h-3 flex-1 max-w-md rounded bg-[var(--line)]" />
-              <span className="h-3 w-24 rounded bg-[var(--line)]" />
+              <span className="h-3 w-10 rounded bg-[var(--line)]" />
               <span className="h-3 w-16 rounded bg-[var(--line)]" />
             </div>
           ))}
@@ -198,6 +206,20 @@ export default function Queue() {
         </p>
       ) : (
         <ul>
+          {/* header row: same grid as the rows, so the dashes below it read as "empty", not broken */}
+          <li
+            aria-hidden
+            className="grid grid-cols-[92px_minmax(0,1fr)_136px_72px_64px_108px] 2xl:grid-cols-[92px_minmax(0,1fr)_110px_96px_136px_72px_64px_108px] gap-4 px-1 pt-3 pb-2 font-array text-[9.5px] tracking-[0.14em] text-[var(--mut)] border-b border-[var(--line)]"
+          >
+            <span>SOURCE</span>
+            <span>TICKET</span>
+            <span className="hidden 2xl:block">TAGS</span>
+            <span className="hidden 2xl:block">ASSIGNEE</span>
+            <span>STATUS</span>
+            <span>PRIORITY</span>
+            <span>OPENED</span>
+            <span>SLA</span>
+          </li>
           {tickets.map((t, idx) => {
             const st = statusView(t.human_status);
             const sla = slaLabel(t);
@@ -209,7 +231,7 @@ export default function Queue() {
               >
                 <Link
                   href={`/workspace/tickets/${t.ticket_id}`}
-                  className="row grid-cols-[48px_1fr_110px_100px_130px_80px_70px_110px]"
+                  className="row grid-cols-[92px_minmax(0,1fr)_136px_72px_64px_108px] 2xl:grid-cols-[92px_minmax(0,1fr)_110px_96px_136px_72px_64px_108px]"
                 >
                   <span className="font-array text-[10.5px] text-[var(--mut)] leading-relaxed">
                     {SOURCE_GLYPH[t.source ?? ""] ?? "▤"}{" "}
@@ -217,25 +239,25 @@ export default function Queue() {
                     <br />
                     {t.ticket_id.slice(0, 6)}
                   </span>
-                  <span>
-                    <span className="block font-semibold text-[15.5px]">
-                      {t.subject}
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="font-semibold text-[15.5px] truncate">{t.subject}</span>
                       {t.created_at && Date.now() - new Date(t.created_at).getTime() < 60_000 && (
-                        <span className="ml-2 align-middle font-array text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--olive)] text-white">
+                        <span className="shrink-0 font-array text-[9.5px] px-1.5 py-0.5 rounded bg-[var(--olive)] text-white">
                           NEW
                         </span>
                       )}
                     </span>
                     {t.preview && (
-                      <span className="block text-[12.5px] text-[var(--mut)] mt-0.5">
+                      <span className="block text-[12.5px] text-[var(--mut)] mt-0.5 truncate">
                         {t.preview}…
                       </span>
                     )}
                   </span>
-                  <span className="font-array text-[10.5px] text-[var(--mut)]">
+                  <span className="font-array text-[10.5px] text-[var(--mut)] truncate min-w-0 hidden 2xl:block">
                     {(t.tags ?? []).slice(0, 3).join(" · ").toUpperCase() || "—"}
                   </span>
-                  <span className="badge">
+                  <span className="badge truncate min-w-0 hidden 2xl:block">
                     {t.assignee ? t.assignee.toUpperCase() : "—"}
                   </span>
                   <span
@@ -263,7 +285,7 @@ export default function Queue() {
                       : "—"}
                   </span>
                   <span
-                    className={`badge tabular-nums ${sla.breached ? "badge-bad font-semibold" : ""}`}
+                    className={`badge tabular-nums truncate min-w-0 ${sla.breached ? "badge-bad font-semibold" : ""}`}
                   >
                     {sla.text}
                   </span>

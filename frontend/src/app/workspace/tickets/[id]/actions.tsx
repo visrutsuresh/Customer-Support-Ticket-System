@@ -177,7 +177,7 @@ export default function Actions({
           placeholder={escalated ? "Or write your own reply…" : "Add to the conversation…"}
           className="w-full h-32 px-4 py-3 text-[13.5px] leading-relaxed bg-transparent outline-none resize-y"
         />
-        <div className="flex flex-wrap gap-2 items-center px-3 py-2.5 border-t border-[var(--line)]">
+        <div className="flex flex-wrap gap-2 items-center px-4 py-2.5 border-t border-[var(--line)]">
           <button onClick={send} disabled={busy || !text.trim()} className="btn disabled:opacity-40">
             {busy ? "Working…" : sendLabel}
           </button>

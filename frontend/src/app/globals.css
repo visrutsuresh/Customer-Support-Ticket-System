@@ -247,8 +247,9 @@ h3 {
   transition: all 0.15s;
 }
 .row:hover {
+  /* accent instead of a padding shift: columns must stay under their headers */
   background: var(--paper-2);
-  padding-left: 12px;
+  box-shadow: inset 3px 0 0 var(--ox);
 }
 
 /* indeterminate work bar: shown wherever a ticket is PROCESSING so the

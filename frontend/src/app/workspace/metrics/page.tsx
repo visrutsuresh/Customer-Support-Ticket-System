@@ -196,7 +196,7 @@ export default function PerformanceDashboard() {
       <h2 className="text-[19px] font-bold mt-9 pt-4 border-t border-[var(--ink)]">By category</h2>
       <ul className="mt-1">
         {m.by_category.map((c) => (
-          <li key={c.category} className="row grid-cols-[1fr_auto]">
+          <li key={c.category} className="grid grid-cols-[1fr_auto] items-center gap-4 py-4 px-1 border-b border-[var(--line)]">
             <span className="text-[14px]">{c.category}</span>
             <span className="font-array text-[13px] font-semibold">{c.n}</span>
           </li>

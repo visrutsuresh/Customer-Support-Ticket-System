@@ -104,6 +104,10 @@ export default function TicketDetail() {
   const channel = returnChannel(s.ticket.source);
   const messages = s.messages ?? [{ role: "customer", body: s.ticket.body }];
   const custInitials = initials(s.ticket.customer_name, s.ticket.customer_email);
+  // where the machine acted: before the first agent turn. Not "first non-internal
+  // after the opener": a customer follow-up can arrive before the machine replies,
+  // and the pill must never sit above a customer bubble.
+  const verdictAt = messages.findIndex((m) => m.role !== "customer" && m.role !== "internal");
 
   // the machine's move, told inside the thread where it happened
   const verdictLine = autoHandled
@@ -137,7 +141,7 @@ export default function TicketDetail() {
   );
 
   return (
-    <main className="max-w-[1500px]">
+    <main>
       {/* ---------- header: who, where from, and the machine's state at a glance ---------- */}
       <div className="px-8 py-4 border-b border-[var(--ink)] flex items-center gap-3.5 flex-wrap">
         <Link href="/workspace" className="font-array text-[11px] text-[var(--mut)] hover:text-[var(--ox)] shrink-0">
@@ -160,24 +164,27 @@ export default function TicketDetail() {
             </span>
           </div>
         </div>
-        <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink)]">
-          {channel ? `✉ ${s.ticket.source.toUpperCase()}` : (s.ticket.source ?? "—").toUpperCase()}
-        </span>
-        {autoHandled && (
-          <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--olive)] text-[var(--paper)]">
-            ⚡ AUTO-HANDLED
+        {/* pills right-align as one group and wrap as a unit, never under the back link */}
+        <div className="ml-auto shrink-0 flex items-center gap-2">
+          {s.decision.assignee?.name && (
+            <span className="font-array text-[10px] text-[var(--mut)]">
+              ASSIGNED {s.decision.assignee.name.toUpperCase()}
+            </span>
+          )}
+          <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink)]">
+            {channel ? `✉ ${s.ticket.source.toUpperCase()}` : (s.ticket.source ?? "—").toUpperCase()}
           </span>
-        )}
-        {escalated && (
-          <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--rust)] text-[var(--paper)]">
-            ✋ HELD FOR REVIEW
-          </span>
-        )}
-        {s.decision.assignee?.name && (
-          <span className="font-array text-[10px] text-[var(--mut)] ml-auto">
-            ASSIGNED {s.decision.assignee.name.toUpperCase()}
-          </span>
-        )}
+          {autoHandled && (
+            <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--olive)] text-[var(--paper)]">
+              ⚡ AUTO-HANDLED
+            </span>
+          )}
+          {escalated && (
+            <span className="font-array text-[10px] tracking-[0.12em] px-2.5 py-1 rounded-[3px] bg-[var(--rust)] text-[var(--paper)]">
+              ✋ HELD FOR REVIEW
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start">
@@ -206,7 +213,7 @@ export default function TicketDetail() {
               return (
                 <div key={i}>
                   {/* the verdict happened between their first message and whatever followed */}
-                  {i === 1 && verdictLine && (
+                  {i === verdictAt && verdictLine && (
                     <p className="text-center mb-4">
                       <span className="font-array text-[10px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
                         {verdictLine.toUpperCase()}
@@ -234,7 +241,7 @@ export default function TicketDetail() {
                       <span className="block font-array text-[9.5px] tracking-[0.12em] text-[var(--mut)] mt-1 px-1">
                         {mine
                           ? `NIMBUS SUPPORT${channel ? ` · SENT VIA ${channel.toUpperCase()}` : ""}${
-                              autoHandled && i === 1 ? " · ⚡ AUTO-SENT" : ""
+                              autoHandled && i === verdictAt ? " · ⚡ AUTO-SENT" : ""
                             }`
                           : (s.ticket.customer_name ?? "CUSTOMER").toUpperCase()}
                       </span>
@@ -244,8 +251,8 @@ export default function TicketDetail() {
               );
             })}
 
-            {/* escalated with no agent turn yet: the verdict line still needs a home */}
-            {messages.length === 1 && verdictLine && (
+            {/* no non-internal turn after the opener yet: the verdict line still needs a home */}
+            {verdictAt === -1 && verdictLine && (
               <p className="text-center">
                 <span className="font-array text-[10px] tracking-[0.1em] text-[var(--mut)] bg-[var(--paper)] border border-[var(--line)] rounded-full px-4 py-1.5">
                   {verdictLine.toUpperCase()}
@@ -306,7 +313,10 @@ export default function TicketDetail() {
         </section>
 
         {/* ---------- right drawer: verdict detail + everything we know ---------- */}
-        <aside className="border-l border-[var(--line)] bg-[var(--paper-2)] px-5 py-6 sticky top-4">
+        {/* outer div stretches so the tint and border run the full column height;
+            the inner sticky keeps the content in view while the thread scrolls */}
+        <div className="self-stretch border-l border-[var(--line)] bg-[var(--paper-2)]">
+        <aside className="sticky top-0 px-5 py-6">
           <span className="field">The machine&apos;s verdict</span>
           <div className="flex items-center gap-2.5">
             <span
@@ -342,6 +352,7 @@ export default function TicketDetail() {
           />
           <Attachments id={id} locked={locked} />
         </aside>
+        </div>
       </div>
     </main>
   );
