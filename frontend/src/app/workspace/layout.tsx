@@ -42,16 +42,6 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     }
   }
 
-  async function syncZendesk() {
-    setSyncNote("SYNCING ZENDESK…");
-    try {
-      const r = await api("/zendesk/sync", { method: "POST" });
-      setSyncNote(`ZENDESK: +${r.fetched}`);
-    } catch {
-      setSyncNote("ZENDESK SYNC FAILED");
-    }
-  }
-
   async function signOut() {
     await logout();
     router.replace("/login");
@@ -112,12 +102,6 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
             className="text-left py-2 pr-4 text-[13.5px] font-medium text-[var(--mut)] hover:text-[var(--ink)] transition-colors"
           >
             Sync Jira
-          </button>
-          <button
-            onClick={syncZendesk}
-            className="text-left py-2 pr-4 text-[13.5px] font-medium text-[var(--mut)] hover:text-[var(--ink)] transition-colors"
-          >
-            Sync Zendesk
           </button>
         </nav>
 
