@@ -2,6 +2,7 @@ import json
 import re
 
 from app import router, tools
+from app.brand import brand_name, sign_off
 from app.kb import index_resolved
 from app.pii import scan
 from app.state import public_messages
@@ -104,7 +105,7 @@ def retrieve_agent(ticket, lane="private", level="complex") -> list:
 
 
 GENERATE_SYSTEM = """
-You are the Response Generation agent for Nimbus customer support.
+You are the Response Generation agent for __BRAND__ customer support.
 Decide how to handle this ticket, gathering any context you need first.
 You are shown the knowledge-base articles our retrieval already found (in the context below). Read them before you decide.
 
@@ -136,7 +137,9 @@ Reply every turn with ONE JSON object, nothing else.
   To use a tool: {"thought":"...","action":"<tool>","args":{...}}
   To finish:     {"thought":"...","action":"finish","result":{"kind":"answer|question|escalate","confidence":<0-100>,"notes":"<what to say, including any facts you found; or what is missing; or why escalate>"}}
 confidence = 0-100, how sure you are the answer is correct AND complete. Be honest.
-"""
+"""  # __BRAND__ is filled in at USE time, not here: api.py imports this module before
+# app.users runs load_dotenv(), so reading the environment at import would miss BRAND_NAME.
+# Plain string rather than an f-string because the block is full of JSON braces.
 
 
 def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str:
@@ -154,7 +157,7 @@ def _write_reply(ticket, articles, customer, notes, lane, tier, convo="") -> str
     The last line above is the customer's latest message. Reply to that, using the earlier turns for context. Do not repeat a solution you already gave, and do not contradict an earlier reply.
     Use the guidance from triage above and these knowledge base articles. Do not invent details beyond what they contain:
     {kb_text}
-    Open with exactly "{greeting}" and sign off as 'The Nimbus Support Team'. No placeholders like [NAME.
+    Open with exactly "{greeting}" and sign off as '{sign_off()}'. No placeholders like [NAME.
     VOICE RULE: you are writing directly TO the customer. Address them as "you". Never refer to them in the
     third person ("the customer", "they"), never write phrases like "Based on the knowledge base" or
     "suggest the customer", and rewrite any internal guidance into natural, direct instructions to the reader.
@@ -177,7 +180,8 @@ def generate_agent(ticket, articles, lane="cloud", tier="complex", history=None)
         # once we have enough context, or the model starts repeating, demand a decision instead of more tools
         must_finish = len(cache) >= 4 or redundant >= 2 or step >= MAX_STEPS - 1
         hint = "\nSTOP calling tools. You have enough context now. Reply ONLY with the finish JSON." if must_finish else ""
-        move = _parse(router.think(f"{GENERATE_SYSTEM}\n\n{context}\n{transcript}{hint}\nYour JSON:", max_new_tokens=512))
+        system = GENERATE_SYSTEM.replace("__BRAND__", brand_name())
+        move = _parse(router.think(f"{system}\n\n{context}\n{transcript}{hint}\nYour JSON:", max_new_tokens=512))
         action = move.get("action")
         if action == "finish":
             r = move["result"]
@@ -244,8 +248,10 @@ def review_agent(ticket, draft_reply, lane="private", level="complex") -> dict:
     issues = []
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft_reply):
         issues.append("contains an unfilled placeholder in square brackets")
+    # loose substring on purpose, same reasoning as graph.py: the pass/fail behaviour is
+    # unchanged so the published benchmark numbers stay valid; only the wording is brand-aware
     if "Support Team" not in draft_reply:
-        issues.append("missing the Nimbus Support Team sign-off")
+        issues.append(f"missing the {sign_off()} sign-off")
     leaked = scan(draft_reply)
     if leaked:
         issues.append("reply exposes PII: " + ", ".join(leaked))

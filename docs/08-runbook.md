@@ -32,6 +32,22 @@ Stop with `Ctrl-C` in each terminal, then `docker compose down` (without `-v`, w
 
 After any `docker compose down -v`, all four must be run again.
 
+`uv run python seed_all.py` runs the whole list in the right order, and every step is idempotent, so re-running after a partial failure is safe.
+
+## 2a. Onboarding a client
+
+Enklima is a product a company installs, so bringing a client on board is a provisioning run rather than a signup screen. One deployment serves one client on purpose: the product's promise is that sensitive tickets never leave the client's own infrastructure, and a shared database would undo that.
+
+```bash
+uv run python provision_client.py --brand Nimbus --tagline "Support that answers"
+```
+
+It checks the deployment is configured, refuses with a readable message naming what is missing rather than failing deep inside a seed, runs the same six seeds, and then prints the handover: the brand lines to put in `.env`, the four files holding content the client replaces with its own (`policy.md`, `seed_kb.py`, `app/roster.py`, `seed_data.py`), the channel credentials to add, and the commands to start it.
+
+Add `--skip-seeds` to print the configuration report and the handover without touching any data.
+
+**What is product and what is client** is the whole reuse story. The pipeline, the agents, the queue, authentication and the SLA logic are the product. The brand, the channels, the knowledge base, the policy, the roster and the thresholds are that client's configuration and content. Nothing about a client lives in the product code, which is why `BRAND_NAME` alone repaints the portal **and** changes the name every reply is signed with.
+
 ## 3. Health checks
 
 | Check | Command or address | Healthy answer |

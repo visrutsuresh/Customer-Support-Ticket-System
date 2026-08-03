@@ -189,8 +189,12 @@ export default function Queue() {
           ))}
         </div>
       ) : tickets.length === 0 ? (
+        // a filter the visitor never set must not be blamed: on a freshly
+        // provisioned client the queue is empty because nobody has written in yet
         <p className="p-4 text-[var(--mut)]">
-          No tickets match. Clear the search or filters to see the full queue.
+          {q || status || category || scope !== "live"
+            ? "No tickets match. Clear the search or filters to see the full queue."
+            : "No tickets yet. When a customer writes in, their request lands here."}
         </p>
       ) : (
         <ul>

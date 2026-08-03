@@ -28,7 +28,8 @@
 | `DATABASE_URL` | yes | Postgres connection string. Use `127.0.0.1` rather than `localhost` to force IPv4 |
 | `AUTH_SECRET` | yes | Signs session cookies and password-reset tokens. Changing it logs everyone out |
 | `AGENT_MODE` | no, defaults `deterministic` | `deterministic` or `autonomous` |
-| `BRAND_NAME`, `BRAND_TAGLINE` | no | Client branding shown in the portal |
+| `BRAND_NAME`, `BRAND_TAGLINE` | no | The client's branding. Repaints the portal through `GET /config`, **and** names the support team every outbound reply is signed with, in both the deterministic and the autonomous pipeline. Defaults to `Support` |
+| `BRAND_SIGNOFF` | no | Overrides the sign-off wording outright, for a client whose team is not called "The X Support Team". Derived from `BRAND_NAME` when unset |
 
 ### Email channel
 

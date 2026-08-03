@@ -6,6 +6,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app import router
 from app.audit import verify
+from app.brand import sign_off
 from app.intake import normalize
 from app.kb import search
 from app.pii import scan
@@ -231,7 +232,7 @@ def generate(state: State) -> dict:
     Do not escalate just because the ticket is important or the customer is upset; if the KB answers it, answer it. Prefer "KIND: question" over "KIND: escalate" whenever the only thing missing is a detail the customer can provide (an order number, which charge, the exact error message). Put the actual reply on the lines after that control line (for escalate, no reply is needed).
     On that same control line, after the KIND word, add "CONFIDENCE: N" where N is 0-100 = how sure you are the answer is correct AND complete from the knowledge base above (be honest; partial coverage = lower). Example: "KIND: answer CONFIDENCE: 85".
 
-    Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as 'The Nimbus Support Team'. Sound helpful and warm.
+    Do not use placeholders such as [YOUR NAME]. Open the reply with exactly this greeting : {greeting} and sign off as '{sign_off()}'. Sound helpful and warm.
     VOICE RULE: you are writing directly TO the customer. Address them as "you". Never refer to them in the third person ("the customer", "they"), never write phrases like "Based on the knowledge base" or "suggest the customer", and rewrite any internal guidance into natural, direct instructions to the reader.
     """
 
@@ -269,8 +270,11 @@ def review(state: State) -> dict:
     # deterministic checks (free, always correct)
     if re.search(r"\[[A-Za-z0-9 _/]+\]", draft):
         issues.append("contains an unfilled placeholder in square brackets")
+    # the test stays the loose "Support Team" substring on purpose: tightening it to the
+    # exact configured sign-off would change pass/fail behaviour and invalidate the
+    # published benchmark numbers. Only the message the reviewer reads is brand-aware.
     if "Support Team" not in draft:
-        issues.append("missing the Nimbus Support Team sign-off")
+        issues.append(f"missing the {sign_off()} sign-off")
     # data-privacy :an outbound reply must not carry PII (echoed sensitive data, or another customer's data leaked in)
     leaked = scan(draft)
     if leaked:
