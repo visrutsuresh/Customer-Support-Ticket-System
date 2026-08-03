@@ -44,7 +44,7 @@ export default function PortalShell({ children }: { children: (user: User) => Re
 
   return (
     <div className="min-h-[100dvh] bg-[var(--paper)]">
-      <header className="max-w-2xl mx-auto px-6 pt-10 pb-6 flex items-start">
+      <header className="max-w-4xl mx-auto px-6 pt-10 pb-6 flex items-start">
         <Link href="/" className="flex items-center gap-3">
           <CloudMark size={38} className="text-[var(--ox)] shrink-0" />
           <span>
@@ -62,7 +62,7 @@ export default function PortalShell({ children }: { children: (user: User) => Re
           </button>
         </div>
       </header>
-      <main className="max-w-2xl mx-auto px-6 pb-16">{children(user)}</main>
+      <main className="max-w-4xl mx-auto px-6 pb-16">{children(user)}</main>
     </div>
   );
 }

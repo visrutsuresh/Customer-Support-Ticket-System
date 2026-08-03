@@ -44,11 +44,14 @@ export default function PortalHome() {
       {(user) => (
         <>
           {/* the writing line: typing here IS starting the conversation */}
-          <p className="field mt-6 rise" style={{ "--i": 0 } as React.CSSProperties}>
+          <p
+            className="font-array text-[13px] tracking-[0.15em] uppercase text-[var(--mut)] font-semibold mt-12 mb-3 rise"
+            style={{ "--i": 0 } as React.CSSProperties}
+          >
             Write to us · any hour · a person signs off every reply
           </p>
           <div
-            className="flex items-end gap-3 border-b-2 border-[var(--ink)] pb-2 rise"
+            className="flex items-end gap-4 border-b-2 border-[var(--ink)] pb-3 rise"
             style={{ "--i": 1 } as React.CSSProperties}
           >
             <input
@@ -56,29 +59,29 @@ export default function PortalHome() {
               onChange={(e) => setLine(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && start()}
               placeholder={`What's going on, ${user.email.split("@")[0]}?`}
-              className="flex-1 bg-transparent outline-none text-[26px] font-bold leading-tight placeholder:text-[#cfc7b4] caret-[var(--ox)]"
+              className="flex-1 bg-transparent outline-none text-[42px] font-bold leading-tight placeholder:text-[#cfc7b4] caret-[var(--ox)]"
               style={{ fontFamily: "var(--font-cabinet)" }}
             />
-            <button onClick={start} className="btn shrink-0">
+            <button onClick={start} className="btn shrink-0 !text-[15px] !px-7 !py-3">
               Start
             </button>
           </div>
-          <div className="flex flex-wrap gap-2 mt-3 rise" style={{ "--i": 2 } as React.CSSProperties}>
+          <div className="flex flex-wrap gap-2.5 mt-4 rise" style={{ "--i": 2 } as React.CSSProperties}>
             {QUICK.map((q) => (
               <button
                 key={q.label}
                 onClick={() => router.push(`/new?topic=${encodeURIComponent(q.topic)}`)}
-                className="chip"
+                className="chip !text-[13px] !px-4 !py-2"
               >
                 {q.label.toUpperCase()}
               </button>
             ))}
           </div>
 
-          <div className="flex items-baseline gap-3.5 mt-14 rise" style={{ "--i": 3 } as React.CSSProperties}>
-            <h2 className="text-[19px] font-bold">Your entries</h2>
+          <div className="flex items-baseline gap-4 mt-16 rise" style={{ "--i": 3 } as React.CSSProperties}>
+            <h2 className="text-[23px] font-bold">Your entries</h2>
             {reqs && reqs.length > 0 && (
-              <span className="font-array text-[12px] text-[var(--mut)]">
+              <span className="font-array text-[13px] text-[var(--mut)]">
                 {open} OPEN{solved > 0 ? ` · ${solved} SOLVED` : ""}
               </span>
             )}
@@ -96,15 +99,15 @@ export default function PortalHome() {
                   <li key={r.ticket_id} className="rise" style={{ "--i": i + 4 } as React.CSSProperties}>
                     <Link
                       href={`/requests/${r.ticket_id}`}
-                      className={`grid grid-cols-[86px_minmax(0,1fr)_auto] gap-4 items-baseline py-4 px-1 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:shadow-[inset_3px_0_0_var(--ox)] transition-all ${
+                      className={`grid grid-cols-[96px_minmax(0,1fr)_auto] gap-5 items-baseline py-5 px-1.5 border-b border-[var(--line)] hover:bg-[var(--paper-2)] hover:shadow-[inset_3px_0_0_var(--ox)] transition-all ${
                         solvedRow ? "opacity-60" : ""
                       }`}
                     >
-                      <span className="font-array text-[12px] text-[var(--mut)]">
+                      <span className="font-array text-[13px] text-[var(--mut)]">
                         {new Date(r.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }).toUpperCase()}
                       </span>
-                      <span className="font-semibold text-[15.5px] truncate">{r.subject}</span>
-                      <span className={`font-array text-[11.5px] tracking-[0.06em] rounded-[3px] px-2.5 py-1 ${st.cls}`}>
+                      <span className="font-semibold text-[17.5px] truncate">{r.subject}</span>
+                      <span className={`font-array text-[12.5px] tracking-[0.06em] rounded-[3px] px-3 py-1.5 ${st.cls}`}>
                         {st.text}
                       </span>
                     </Link>
