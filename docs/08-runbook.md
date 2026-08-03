@@ -48,6 +48,18 @@ Add `--skip-seeds` to print the configuration report and the handover without to
 
 **What is product and what is client** is the whole reuse story. The pipeline, the agents, the queue, authentication and the SLA logic are the product. The brand, the channels, the knowledge base, the policy, the roster and the thresholds are that client's configuration and content. Nothing about a client lives in the product code, which is why `BRAND_NAME` alone repaints the portal **and** changes the name every reply is signed with.
 
+### Rotating the seeded credentials
+
+The seeded passwords are development defaults and **this repository is public**, so anybody can read them. They are fine on a laptop and unacceptable on anything reachable from the internet.
+
+To retire them, supply an override and re-run the same seeder against the deployed database:
+
+```bash
+SEED_ADMIN_PASSWORD=... SEED_STAFF_PASSWORD=... SEED_CUSTOMER_PASSWORD=... DATABASE_URL=<the deployed database> uv run python seed_users.py
+```
+
+Re-running with an override **rotates** an account that already exists: it replaces the stored hash and keeps the role. Accounts are matched by address, so nothing is duplicated and nothing else is disturbed. Run it with no overrides and it prints a reminder that the published defaults are in use.
+
 ## 3. Health checks
 
 | Check | Command or address | Healthy answer |

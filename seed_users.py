@@ -1,5 +1,16 @@
-"""Seed the staff accounts plus a demo customer. Idempotent: run any time."""
+"""Seed the staff accounts plus a demo customer. Idempotent: run any time.
+
+The passwords below are DEVELOPMENT defaults and this repository is public, so anyone
+can read them. A deployment must override them from the environment:
+
+    SEED_ADMIN_PASSWORD=... SEED_STAFF_PASSWORD=... SEED_CUSTOMER_PASSWORD=... \\
+    DATABASE_URL=<the deployed database> uv run python seed_users.py
+
+Run that way against a database whose accounts already exist and it ROTATES their
+passwords, which is how a leaked development credential actually gets retired.
+"""
 import asyncio
+import os
 
 from dotenv import load_dotenv
 
@@ -16,6 +27,15 @@ SEEDS = [
     ("customer@nimbus.dev", "customer-dev-password", "customer"),
 ]
 
+# Per-role overrides. The literals above stay as the local-development default, so
+# nothing changes on a developer machine, but a deployment can and must supply its own.
+_OVERRIDES = {
+    "admin": os.getenv("SEED_ADMIN_PASSWORD", "").strip(),
+    "staff": os.getenv("SEED_STAFF_PASSWORD", "").strip(),
+    "customer": os.getenv("SEED_CUSTOMER_PASSWORD", "").strip(),
+}
+SEEDS = [(email, _OVERRIDES.get(role) or pw, role) for email, pw, role in SEEDS]
+
 
 async def main():
     await u.create_user_table()
@@ -30,8 +50,25 @@ async def main():
             except UserAlreadyExists:
                 # re-running must still correct the role on an account that already exists
                 existing = await db.get_by_email(email)
-                await db.update(existing, {"role": role})
-                print(f"repaired {email} as {role}")
+                patch = {"role": role}
+                if _OVERRIDES.get(role):
+                    # an override was supplied, so this run is a ROTATION: replace the
+                    # stored hash too, or the published default would keep working.
+                    # hashed explicitly, because db.update writes the column raw
+                    patch["hashed_password"] = mgr.password_helper.hash(password)
+                await db.update(existing, patch)
+                what = "repaired + rotated" if _OVERRIDES.get(role) else "repaired"
+                print(f"{what} {email} as {role}")
+
+    if not any(_OVERRIDES.values()):
+        print(
+            "\nNOTE: seeded with the development passwords published in this public "
+            "repository. Fine locally. For any reachable deployment, set "
+            "SEED_ADMIN_PASSWORD, SEED_STAFF_PASSWORD, SEED_CUSTOMER_PASSWORD "
+            "and run this again to rotate them."
+        )
 
 
-asyncio.run(main())
+# guarded: importing this module must not seed a database
+if __name__ == "__main__":
+    asyncio.run(main())
