@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app import billing, crm, jira_channel, kb, orders, ratelimit, router, store
+from app import billing, crm, jira_channel, kb, orders, ratelimit, router, store, zendesk_channel
 from app.agents import learn_agent
 from app.email_channel import fetch_unread, send_email
 from app.graph import auto_tags, graph
@@ -448,6 +448,14 @@ def dispatch_reply(state: dict, reply: str, ticket_id: str) -> str:
                 return f"jira_comment:{issue}"
             except Exception as e:
                 return f"jira_failed: {e}"
+    if t.get("source") == "zendesk":
+        zid = store.get_zendesk_link(ticket_id)
+        if zid:
+            try:
+                zendesk_channel.post_comment(zid, reply)
+                return f"zendesk_comment:{zid}"
+            except Exception as e:
+                return f"zendesk_failed: {e}"
     return "in_app"
 
 
@@ -564,6 +572,31 @@ def jira_sync(background: BackgroundTasks, user: User = Depends(require_staff)):
     return {"fetched": len(issues), "tickets": created}
 
 
+@app.post("/zendesk/sync")
+def zendesk_sync(background: BackgroundTasks, user: User = Depends(require_staff)):
+    try:
+        zd_tickets = zendesk_channel.fetch_new()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"zendesk fetch failed: {e}")
+    created = []
+    for raw in zd_tickets:
+        ticket_id = f"T-{uuid.uuid4().hex[:8]}"
+        store.save_pending(
+            ticket_id,
+            raw["subject"],
+            raw["body"],
+            raw["source"],
+            raw["name"],
+            raw["email"],
+            datetime.now(timezone.utc),
+        )
+        store.add_zendesk_link(ticket_id, raw["zendesk_id"])
+        payload = {k: raw[k] for k in ("subject", "body", "source", "name", "email")}
+        background.add_task(_process, ticket_id, payload)
+        created.append({"ticket_id": ticket_id, "zendesk_id": raw["zendesk_id"]})
+    return {"fetched": len(zd_tickets), "tickets": created}
+
+
 class ResolveIn(BaseModel):
     csat: int | None = Field(default=None, ge=1, le=10)  # optional 1-10 star rating
 
@@ -592,6 +625,13 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
             jira_done = jira_channel.transition_done(issue)
         except Exception:
             jira_done = False  # their board lagging must never block our resolve
+    zendesk_done = None
+    zid = store.get_zendesk_link(ticket_id)
+    if zid:
+        try:
+            zendesk_done = zendesk_channel.mark_solved(zid)
+        except Exception:
+            zendesk_done = False  # same rule as jira: their outage never blocks our resolve
     new_id = store.file_as_history(ticket_id)  # archive FIRST: a KB failure must never strand a ticket
     # write-back the resolution we actually sent (last agent turn), quality-gated
     ticket = Ticket(**state["ticket"])
@@ -609,6 +649,7 @@ def resolve_ticket(ticket_id: str, payload: ResolveIn | None = None, user: User 
         "learned": out.get("learned", False),
         "csat": csat,
         "jira_done": jira_done,
+        "zendesk_done": zendesk_done,
     }
 
 

@@ -37,11 +37,11 @@ Roles: `customer` (own tickets only), `staff` (the whole live queue), `admin` (s
 | GET | `/tickets/{id}/customer` | staff | That customer's record: profile, five most recent orders, five most recent charges. Same need-to-know rule as `/history`, holding this ticket open unlocks this customer and nobody else. These are the lookups the autonomous agents already make as tools, surfaced so a human reviewer is not worse informed than the pipeline that drafted the reply. Each store is read independently, so one being empty or unreachable returns nulls rather than failing the panel. `{"profile": null, ...}` for a sender who is not in the records, which is normal for email and Jira |
 | GET | `/tickets/{id}/thread` | owner or staff | The customer-safe message list, internal notes stripped |
 | POST | `/tickets/{id}/reply` | owner or staff | Adds a customer turn and re-runs the pipeline in the background |
-| POST | `/tickets/{id}/resolve` | owner or staff | Optional `{csat: 1-10}`. Archives the ticket, cancels any in-flight run, closes the Jira issue if there is one, and files the resolution back into the knowledge base |
+| POST | `/tickets/{id}/resolve` | owner or staff | Optional `{csat: 1-10}`. Archives the ticket, cancels any in-flight run, closes the Jira issue or solves the Zendesk ticket if there is one, and files the resolution back into the knowledge base |
 | POST | `/tickets/{id}/reopen` | staff | Brings an archived ticket back; 409 if it is not a reopenable archived ticket |
 | POST | `/my/tickets/{id}/reopen` | customer | Same, for the owner |
 
-`POST /tickets` accepts `{subject, body, source, name?, email?}`. `source` must be one of `chat`, `form`, `email`, `voice_transcript`, `jira`; anything else is rejected as malformed intake.
+`POST /tickets` accepts `{subject, body, source, name?, email?}`. `source` must be one of `chat`, `form`, `email`, `voice_transcript`, `jira`, `zendesk`; anything else is rejected as malformed intake.
 
 ## 4. Review actions
 
@@ -80,6 +80,7 @@ A resolved ticket is locked: approve, reject, edit, note and tag all return 409.
 |---|---|---|---|
 | POST | `/email/sync` | staff | Pulls unread mail into tickets; 502 if the mailbox is unreachable. Machine-generated mail is skipped and counted |
 | POST | `/jira/sync` | staff | Pulls new issues into tickets and remembers the issue key; 502 if Jira is unreachable |
+| POST | `/zendesk/sync` | staff | Pulls untagged Zendesk tickets in and tags them imported so they never import twice; remembers the Zendesk id so approved replies post back as public comments and resolve marks the ticket solved. 502 if Zendesk is unreachable or unconfigured |
 | GET | `/metrics` | staff | Volumes, escalation split, compliance pass rate, latency (warm and cold), estimated GPU cost, ratings, and resolution time |
 
 ## 8. Status codes used
@@ -93,4 +94,4 @@ A resolved ticket is locked: approve, reject, edit, note and tag all return 409.
 | 404 | Unknown ticket, template, or attachment |
 | 409 | The ticket is resolved and locked, or not reopenable |
 | 413 | Attachment above 5 MB |
-| 502 | An upstream channel (mail or Jira) failed |
+| 502 | An upstream channel (mail, Jira or Zendesk) failed |
