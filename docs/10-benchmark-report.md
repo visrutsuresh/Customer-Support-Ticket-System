@@ -80,3 +80,26 @@ uv run python eval.py --classify --limit 5   # cost fence
 ```
 
 Both benchmarks cost GPU money on every wake, except `eval.py` without `--classify`, which is free. Warm the lane first and run a whole batch in one window rather than one ticket at a time. Raw results are written to `bench_*.json` and `eval_results.json`.
+
+## Lane latency: why there is no "use the small model for cheap steps" option
+
+Measured 2026-08-03 against the live private lane, both containers warm, median of three
+calls on a realistic tool-selection prompt:
+
+| output tokens | 3B on T4 | 14B on A10G | ratio |
+|---|---|---|---|
+| 128 | 7.4s | 9.6s | the 14B is 1.30x slower |
+| 512 | 14.8s | 12.7s | **the 14B is faster** |
+
+Every agent loop runs at `max_new_tokens=512`, so at the size that matters **the larger
+model is the faster one**. The bottleneck is the hardware, not the parameter count: the
+3B sits on a T4 and the 14B on an A10G.
+
+A change to route "cheap" tool-selection steps to the 3B was written, measured, and
+**removed before release** on this evidence. It would have cost latency and answer
+quality at the same time. Recorded because the intuition it contradicts, smaller means
+faster, is the obvious one and would otherwise be tried again.
+
+An 8-token probe run first showed the 14B at 1.3s against the 3B at 2.6s, which
+overstates the effect: at that length the call is all overhead and no decoding. The
+512-token figure is the honest one.

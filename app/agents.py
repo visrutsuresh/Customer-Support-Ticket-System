@@ -88,9 +88,7 @@ def retrieve_agent(ticket, lane="private", level="complex") -> list:
     seen = {}  # title -> full article dict
     for _ in range(MAX_STEPS):
         prompt = f"{RETRIEVE_SYSTEM}\n\n{context}\n{transcript}\nYOUR JSON:"
-        # cheap: this loop only decides WHICH search to run next, never what the answer is.
-        # Whatever it finds is judged downstream by the big model.
-        move = _parse(router.think(prompt, max_new_tokens=512, lane=lane, level=level, cheap=True))
+        move = _parse(router.think(prompt, max_new_tokens=512, lane=lane, level=level))
         if move.get("action") == "finish":
             titles = move["result"].get("relevant_titles", [])
             chosen = [seen[t] for t in titles if t in seen]
@@ -302,9 +300,7 @@ def learn_agent(ticket, draft_reply, resolved: bool) -> dict:
         f"Resolution: {draft_reply}\n"
         f'Reply with ONE JSON object: {{"thought":"...","save":true}} or {{"thought":"...","save":false}}'
     )
-    # cheap: a yes/no on whether a resolution is reusable, after the ticket is already
-    # closed. Nothing the customer sees depends on it
-    move = _parse(router.think(prompt, max_new_tokens=256, cheap=True))
+    move = _parse(router.think(prompt, max_new_tokens=256))
     if move.get("save"):
         content = f"Problem: {ticket.body} Resolution: {draft_reply}"
         index_resolved(ticket.subject, content)  # stays a resolved-ticket record, source preserved

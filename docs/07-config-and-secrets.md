@@ -30,7 +30,6 @@
 | `AGENT_MODE` | no, defaults `deterministic` | `deterministic` or `autonomous` |
 | `PREWARM` | no | `true` makes the login screen wake the GPU on load, so the cold start runs behind the visitor's typing instead of in front of their first ticket. Off by default: the route is unauthenticated and a wake costs real money |
 | `PREWARM_COOLDOWN_S` | no | Global floor between wakes, default 240. However many people load the page, the lane is poked at most once in this window |
-| `AGENT_FAST` | no | Autonomous mode only. `true` runs tool-SELECTION steps on the 3B and leaves the customer reply and the compliance review on the 14B. **Off by default, because `bench_autonomous.json` was measured with every step on the 14B**; turning it on makes the run faster than the benchmarked configuration, so the published escalation figures no longer describe it |
 | `BRAND_NAME`, `BRAND_TAGLINE` | no | The client's branding. Repaints the portal through `GET /config`, **and** names the support team every outbound reply is signed with, in both the deterministic and the autonomous pipeline. Defaults to `Support` |
 | `BRAND_SIGNOFF` | no | Overrides the sign-off wording outright, for a client whose team is not called "The X Support Team". Derived from `BRAND_NAME` when unset |
 
