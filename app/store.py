@@ -732,7 +732,8 @@ def seed_history(customers) -> None:
                 due_at = created + timedelta(minutes=SLA_RESOLUTION_MINUTES.get(priority, SLA_RESOLUTION_MINUTES["medium"]))
                 tags = [category] + ([priority] if escalated else []) + (["unhappy"] if sentiment == "negative" else [])
                 state = {
-                    "ticket": {"subject": pt["subject"], "body": pt["body"], "source": "email", "customer_name": c["name"], "customer_email": c["email"]},
+                    "ticket": {"subject": pt["subject"], "body": pt["body"], "source": pt.get("source", "email"),
+                               "customer_name": c["name"], "customer_email": c["email"]},
                     "classification": {"category": category, "priority": priority, "sentiment": sentiment},
                     "decision": {"action": action, "assignee": owner},
                     "messages": [{"role": "customer", "body": pt["body"]}, {"role": "agent", "body": pt["resolution"]}],

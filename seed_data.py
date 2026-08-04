@@ -145,12 +145,83 @@ BENCH = [
         signup_days_ago=45,
         orders=[order("10455", "Webcam 1080p", 59.99, "in_transit", 4, "1Z5C3R7742")],
     ),  # track my package
+    # --- the account states the generated crowd never produces -----------------
+    # Everyone above is active. account_status and subscription_status are what the
+    # agent's account_status / subscription_details tools return, so a state that
+    # exists in no customer is a branch the agent can never be asked about. Two of
+    # each, so a demo question about "a suspended account" is never a sample of one.
+    customer(
+        "Marco Silva",
+        "marco.silva@example.com",
+        "pro",
+        account_status="suspended",
+        subscription_status="past_due",
+        signup_days_ago=420,
+        charges=[charge(19.99, "Pro plan monthly", 40)],
+        past_tickets=[{"subject": "Why can I not sign in", "body": "My account says suspended and I do not know why.",
+                       "category": "account", "priority": "high", "sentiment": "negative",
+                       "resolution": "Explained the failed payment and how to clear it.", "csat": 6, "source": "chat"}],
+    ),  # suspended for non-payment
+    customer(
+        "Nadia Rahman",
+        "nadia.rahman@example.com",
+        "max",
+        account_status="suspended",
+        subscription_status="past_due",
+        signup_days_ago=610,
+        charges=[charge(49.99, "Max plan monthly", 35)],
+    ),  # a second suspended account, so the state is never a sample of one
+    customer(
+        "Omar Haddad",
+        "omar.haddad@example.com",
+        "pro",
+        account_status="closed",
+        subscription_status="cancelled",
+        signup_days_ago=800,
+        past_tickets=[{"subject": "Closing my account", "body": "Please close my account and delete my data.",
+                       "category": "account", "priority": "medium", "sentiment": "neutral",
+                       "resolution": "Account closed and deletion confirmed in writing.", "csat": 9,
+                       "source": "voice_transcript"}],
+    ),  # closed, and one of the few voice_transcript tickets in the estate
+    customer(
+        "Priya Raman",
+        "priya.raman@example.com",
+        "max",
+        account_status="closed",
+        subscription_status="cancelled",
+        signup_days_ago=950,
+    ),  # a second closed account
+    customer(
+        "Quentin Roy",
+        "quentin.roy@example.com",
+        "max",
+        subscription_status="refund_pending",
+        signup_days_ago=260,
+        charges=[charge(49.99, "Max plan monthly", 8)],
+        orders=[order("10502", "Studio Monitor", 349.99, "delivered", 30, "1Z7D4T1188")],
+    ),  # a second refund_pending, plus a high-value delivered order
+    customer(
+        "Rosa Iglesias",
+        "rosa.iglesias@example.com",
+        "max",
+        signup_days_ago=340,
+        orders=[order("10517", "Docking Station", 189.99, "processing", 1, "")],
+        past_tickets=[{"subject": "Escalating a repeat fault", "body": "This is the third time this has happened.",
+                       "category": "technical", "priority": "critical", "sentiment": "negative",
+                       "resolution": "Escalated to engineering; replacement issued.", "csat": 5, "source": "jira"}],
+    ),  # the only 'critical' priority in the seeded history, arriving over Jira
 ]
 
 
 # realistic past tickets, drawn on by the background cast; each is internally coherent
 # (subject <-> category <-> priority <-> resolution <-> csat) so history makes sense
+# the five source values app/state.py::Ticket accepts. voice_transcript has a parser
+# but no endpoint (the known FR-1 gap), so seeding it is the only place it is visible.
+TICKET_SOURCES = ["email", "form", "chat", "jira", "voice_transcript"]
+
 PAST_TICKET_POOL = [
+    {"subject": "Whole team locked out mid-launch", "body": "Nobody on our account can sign in and we go live in an hour.", "category": "technical", "priority": "critical", "sentiment": "negative", "resolution": "Restored access within the hour and issued a post-incident note.", "csat": 7},
+    {"subject": "Payment taken twice on the same day", "body": "You charged the card twice for one renewal.", "category": "billing", "priority": "critical", "sentiment": "negative", "resolution": "Refunded the duplicate and added a duplicate-charge guard to the account.", "csat": 8},
     {"subject": "Unexpected charge on my card", "body": "I saw a charge I did not recognise.", "category": "billing", "priority": "medium", "sentiment": "neutral", "resolution": "Explained the charge and confirmed it was a valid subscription renewal.", "csat": 8},
     {"subject": "App would not open after an update", "body": "The app crashed on launch after updating.", "category": "technical", "priority": "medium", "sentiment": "negative", "resolution": "Walked the customer through a reinstall, which cleared the crash.", "csat": 7},
     {"subject": "Package arrived damaged", "body": "My order turned up with a cracked case.", "category": "shipping", "priority": "high", "sentiment": "negative", "resolution": "Arranged a free replacement shipment.", "csat": 9},
@@ -165,7 +236,7 @@ PAST_TICKET_POOL = [
 def _background(n):
     out = []
     next_order = 20000  # sequential ids so background orders never collide (birthday-clash with random ids)
-    for _ in range(n):
+    for i in range(n):
         name = fake.name()
         email = fake.unique.email()
         plan = random.choices(["free", "pro", "max"], weights=[3, 4, 3])[0]
@@ -192,7 +263,11 @@ def _background(n):
             )
             next_order += 1
 
-        past = random.sample(PAST_TICKET_POOL, random.randint(0, 2))
+        past = [dict(pt) for pt in random.sample(PAST_TICKET_POOL, random.randint(0, 2))]
+        # every source the canonical Ticket allows appears in the seeded history, not
+        # just email: the intake normaliser handles five and only one was ever exercised
+        for k, pt in enumerate(past):
+            pt["source"] = TICKET_SOURCES[(i + k) % len(TICKET_SOURCES)]
 
         out.append(customer(name, email, plan, signup_days_ago=signup, orders=orders, charges=charges, past_tickets=past))
     return out
