@@ -156,9 +156,12 @@ def _ack_escalation(ticket_id: str) -> None:
     store.append_message(ticket_id, "agent", ESCALATION_ACK)
 
 
-# default matches bench.py's cap; deployed autonomous mode needs more: cold lane
-# load (~77s) + a 60-140s five-agent run does not fit inside 180
-PIPELINE_TIMEOUT_S = int(os.getenv("PIPELINE_TIMEOUT_S", "180"))
+# A cold lane load (~77s) plus a 60-140s five-agent run does not fit inside 180,
+# which is what this used to be: a cold ticket timed out on BOTH attempts and
+# landed in `error` with nothing to show the customer. It also has to exceed
+# router.LANE_TIMEOUT_S (300), or this guard fires first and the lane never gets
+# to report what actually went wrong.
+PIPELINE_TIMEOUT_S = int(os.getenv("PIPELINE_TIMEOUT_S", "420"))
 
 _CANCELLED: set[str] = set()  # resolve marks a ticket doomed; in-flight runs check here before working
 
