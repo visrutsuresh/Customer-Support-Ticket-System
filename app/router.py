@@ -10,6 +10,8 @@ LANE_TOKEN = os.environ["PRIVATE_LANE_TOKEN"]
 REVIEW_URL = os.environ["REVIEW_LANE_URL"]
 MODEL_TIER = os.getenv("MODEL_TIER", "dev").lower()
 
+LANE_TIMEOUT_S = 300  # was an env knob nothing ever set and no doc listed
+
 # Claude model ids for the cloud lane
 HAIKU = "claude-haiku-4-5"
 SONNET = "claude-sonnet-4-6"
@@ -20,7 +22,7 @@ def _modal(url: str, prompt: str, max_new_tokens: int) -> str:
         url,
         json={"prompt": prompt, "token": LANE_TOKEN, "max_new_tokens": max_new_tokens},
         # a cold Modal container spends ~77s loading before it can answer; 90s left no headroom
-        timeout=int(os.getenv("LANE_TIMEOUT_S", "300")),
+        timeout=LANE_TIMEOUT_S,
     )
     resp.raise_for_status()
     return resp.json()["text"]

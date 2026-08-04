@@ -125,16 +125,16 @@ def test_customer_history_needs_a_real_ticket(client, monkeypatch):
     assert client.get("/tickets/T-ghost123/history").status_code == 404
 
 
-def test_approve_zendesk_ticket_replies_as_comment(client, monkeypatch):
+def test_approve_jira_ticket_replies_as_comment(client, monkeypatch):
     posted = {}
-    monkeypatch.setattr(api.store, "get", lambda tid: open_state(reply="On its way.", source="zendesk"))
+    monkeypatch.setattr(api.store, "get", lambda tid: open_state(reply="On its way.", source="jira"))
     monkeypatch.setattr(api.store, "set_status", lambda *a: None)
     monkeypatch.setattr(api.store, "append_message", lambda *a: None)
     monkeypatch.setattr(api.store, "set_lifecycle", lambda *a: None)
-    monkeypatch.setattr(api.store, "get_zendesk_link", lambda tid: "42")
-    monkeypatch.setattr(api.zendesk_channel, "post_comment", lambda zid, body: posted.update({zid: body}))
+    monkeypatch.setattr(api.store, "get_jira_link", lambda tid: "SUP-42")
+    monkeypatch.setattr(api.jira_channel, "post_comment", lambda issue, body: posted.update({issue: body}))
     as_user(fake_user())
     r = client.post("/tickets/T-1/approve")
     assert r.status_code == 200
-    assert r.json()["delivery"] == "zendesk_comment:42"
-    assert posted == {"42": "On its way."}
+    assert r.json()["delivery"] == "jira_comment:SUP-42"
+    assert posted == {"SUP-42": "On its way."}

@@ -33,7 +33,6 @@ function initials(name?: string | null, email?: string | null) {
 function returnChannel(source?: string) {
   if (source === "email") return "email";
   if (source === "jira") return "Jira";
-  if (source === "zendesk") return "Zendesk";
   return ""; // form/chat/voice replies stay in-app
 }
 

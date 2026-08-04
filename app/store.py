@@ -129,13 +129,6 @@ def init_db():
         """)
 
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS zendesk_links(
-            ticket_id TEXT PRIMARY KEY,
-            zendesk_id TEXT NOT NULL
-        )
-        """)
-
-        conn.execute("""
         CREATE TABLE IF NOT EXISTS templates(
             id SERIAL PRIMARY KEY,
             name TEXT,
@@ -241,20 +234,6 @@ def add_jira_link(ticket_id: str, issue_key: str) -> None:
 def get_jira_link(ticket_id: str) -> str | None:
     with _connect() as conn:
         row = conn.execute("SELECT issue_key FROM jira_links WHERE ticket_id = %s", (ticket_id,)).fetchone()
-        return row[0] if row else None
-
-
-def add_zendesk_link(ticket_id: str, zendesk_id: str) -> None:
-    with _connect() as conn:
-        conn.execute(
-            "INSERT INTO zendesk_links (ticket_id, zendesk_id) VALUES (%s, %s) ON CONFLICT (ticket_id) DO NOTHING",
-            (ticket_id, zendesk_id),
-        )
-
-
-def get_zendesk_link(ticket_id: str) -> str | None:
-    with _connect() as conn:
-        row = conn.execute("SELECT zendesk_id FROM zendesk_links WHERE ticket_id = %s", (ticket_id,)).fetchone()
         return row[0] if row else None
 
 

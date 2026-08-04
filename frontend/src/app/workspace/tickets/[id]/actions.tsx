@@ -24,7 +24,7 @@ export default function Actions({
   currentAssignee?: string;
   confidence?: number;
   escalated?: boolean; // the draft card only exists when the machine held back
-  channel?: string; // "email" | "Jira" | "Zendesk" | "" (in-app)
+  channel?: string; // "email" | "Jira" | "" (in-app)
   customerEmail?: string | null;
   onNote?: (body: string) => Promise<void>; // saving an internal note, owned by the page
 }) {

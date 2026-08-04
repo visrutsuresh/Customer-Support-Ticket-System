@@ -473,8 +473,4 @@ if __name__ == "__main__":
     final_state = graph.invoke(initial_state)
 
     print_result(final_state)
-
-    # print("classification:", final_state["classification"])
-    # print("ticket:",final_state["ticket"])
-    # print("---")
     print("audit log:", final_state["audit"])

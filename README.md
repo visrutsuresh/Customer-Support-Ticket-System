@@ -134,7 +134,6 @@ uv run uvicorn api:app --reload
 
 ### Command-line demo (no UI, no DB writes needed for the pipeline itself)
 ```bash
-uv run python demo.py                    # runs the pipeline over 7 sample tickets, prints each result
 ```
 
 ---
@@ -188,7 +187,6 @@ uv run python demo.py                    # runs the pipeline over 7 sample ticke
 
 ```
 api.py              FastAPI backend (create/list/approve/reject/edit)
-demo.py             CLI demo over sample tickets
 seed_kb.py          seed the Weaviate knowledge base
 seed_templates.py   seed the canned replies behind the macro chips
 docker-compose.yml  Postgres + Weaviate
@@ -200,10 +198,11 @@ app/
   router.py         model-lane routing (3B / 14B / Claude) + MODEL_TIER
   kb.py, embed.py   Weaviate knowledge base + embeddings
   store.py          Postgres system of record
+  customer_data.py  the seed-owned fixture tables: customers, orders, charges
   pii.py            PII scanner (sensitivity + outbound-leak check)
   roster.py         synthetic support roster (assignee routing)
   audit.py          hash-chain tamper-evident audit trail
-  adapters.py       ticketing-system adapter seam (Zendesk/Jira/ServiceNow shape)
+  adapters.py       ticketing-system adapter seam, documented shape only (FR-1)
 modal_lane/
   llm_service.py    the open-weight model service deployed to Modal
 frontend/           Next.js reviewer UI (App Router, Tailwind, TypeScript)
