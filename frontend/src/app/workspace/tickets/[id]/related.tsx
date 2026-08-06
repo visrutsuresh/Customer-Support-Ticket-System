@@ -29,10 +29,14 @@ export default function Related({
   const [armed, setArmed] = useState(false);
 
   async function act(kind: "link" | "merge") {
-    const target = other.trim().toUpperCase();
+    // ids are an uppercase prefix + lowercase hex (T-9d1d770f); normalise each
+    // half separately, since uppercasing the whole thing made every lookup miss
+    const raw = other.trim();
+    const dash = raw.indexOf("-");
+    const target = dash > 0 ? raw.slice(0, dash).toUpperCase() + "-" + raw.slice(dash + 1).toLowerCase() : raw;
     setError("");
     if (!target) return;
-    if (target === id.toUpperCase()) {
+    if (target === id) {
       setError("A ticket cannot be linked or merged with itself.");
       return;
     }
