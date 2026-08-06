@@ -7,7 +7,7 @@ from app import router
 from app.agents import classify_agent, generate_agent, retrieve_agent, review_agent
 from app.intake import normalize
 from app.pii import scan
-from app.state import State, confidence_threshold, grounded_confidence
+from app.state import State, commits_money, confidence_threshold, grounded_confidence, is_high_stakes
 
 # --- node wrappers: read shared state, run the agent, write results back ---
 
@@ -103,12 +103,16 @@ def node_decide(state: State) -> dict:
         decision = {"action": "escalate", "reason": "critical priority"}
     elif kind == "escalate":
         decision = {"action": "escalate", "reason": "agent suggested escalation"}
+    elif answerable and grounded >= threshold and commits_money(reply):
+        decision = {"action": "escalate", "reason": "reply commits money: needs a person", "confidence": grounded}
     elif answerable and grounded >= threshold:
         decision = {"action": "auto_send", "reason": "answerable from KB", "confidence": grounded}
     elif answerable:
         decision = {"action": "escalate", "reason": f"below confidence bar ({grounded} < {threshold})", "confidence": grounded}
-    elif kind == "question":
+    elif kind == "question" and not is_high_stakes(c.get("category"), c.get("priority")):
         decision = {"action": "auto_send", "reason": "requesting more information"}
+    elif kind == "question":
+        decision = {"action": "escalate", "reason": "clarifying question on a high-stakes ticket"}
     else:
         decision = {"action": "escalate", "reason": "no usable draft"}
     return {"decision": decision, "audit": ["decide done"]}

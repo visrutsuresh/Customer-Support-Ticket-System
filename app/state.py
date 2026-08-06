@@ -59,10 +59,23 @@ def grounded_confidence(agent_conf, retrieval) -> int:
     return round((agent_conf + top) / 2)
 
 
+def is_high_stakes(category, priority=None) -> bool:
+    # money categories AND high-priority tickets get the strict treatment
+    return category in {"refund", "billing"} or priority == "high"
+
+
+def commits_money(reply: str) -> bool:
+    # a reply that promises money movement never auto-sends, however confident.
+    # ponytail: substring heuristic, over-holds a reply that merely EXPLAINS refund
+    # policy, which is the safe direction; upgrade to a model check if that stings.
+    # "credit" is deliberately absent: it would catch "credit card" in routine replies.
+    r = (reply or "").lower()
+    return "refund" in r or "reimburse" in r
+
+
 def confidence_threshold(category, priority=None) -> int:
-    # money categories AND high-priority tickets must clear a higher bar before auto-send
-    high_stakes = category in {"refund", "billing"} or priority == "high"
-    return CONF_SENSITIVE if high_stakes else CONF_NORMAL
+    # high-stakes tickets must clear a higher bar before auto-send
+    return CONF_SENSITIVE if is_high_stakes(category, priority) else CONF_NORMAL
 
 
 # --- model-output JSON parsing, shared by BOTH modes (ported from Papyrus/Governance
