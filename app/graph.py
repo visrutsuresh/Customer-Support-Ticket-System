@@ -11,17 +11,14 @@ from app.intake import normalize
 from app.kb import search
 from app.pii import scan
 from app.roster import assign
-from app.state import State, confidence_threshold, grounded_confidence, public_messages
+from app.state import State, confidence_threshold, grounded_confidence, parse_model_json, public_messages
 
 warnings.filterwarnings("ignore")
 
 
 def _parse_json(raw: str) -> dict:
-    # small LLMs wrap JSON in markdown fences or add prose; grab the first {...} block and parse that
-    start, end = raw.find("{"), raw.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError(f"no JSON object in model output: {raw!r}")
-    return json.loads(raw[start : end + 1])
+    # first complete object + Python-literal tolerance; shared with agents.py
+    return parse_model_json(raw)
 
 
 # building the worker functions

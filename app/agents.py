@@ -5,15 +5,14 @@ from app import router, tools
 from app.brand import brand_name, sign_off
 from app.kb import index_resolved
 from app.pii import scan
-from app.state import public_messages
+from app.state import parse_model_json, public_messages
 
 MAX_STEPS = 8
 
 
 def _parse(raw: str) -> dict:
-    # same trick as graph.py: grab the first {...} block the model emitted
-    s, e = raw.find("{"), raw.rfind("}")
-    return json.loads(raw[s : e + 1])
+    # first complete object + Python-literal tolerance; shared with graph.py
+    return parse_model_json(raw)
 
 
 CLASSIFY_SYSTEM = """

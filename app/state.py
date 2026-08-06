@@ -63,3 +63,62 @@ def confidence_threshold(category, priority=None) -> int:
     # money categories AND high-priority tickets must clear a higher bar before auto-send
     high_stakes = category in {"refund", "billing"} or priority == "high"
     return CONF_SENSITIVE if high_stakes else CONF_NORMAL
+
+
+# --- model-output JSON parsing, shared by BOTH modes (ported from Papyrus/Governance
+# agents_base, 2026-08-01 fix). The old first-{-to-last-} slice died whenever the
+# model emitted a second JSON object or prose after its answer ("Extra data"), and
+# strict JSON rejected replies holding bare Python literals ("required": True).
+
+import json as _json
+
+_PY_LITERALS = {"True": "true", "False": "false", "None": "null"}
+
+
+def _jsonify_python_literals(s: str) -> str:
+    # rewrite bare True/False/None OUTSIDE strings only; quoted text is untouched
+    out: list[str] = []
+    i, in_str, esc = 0, False, False
+    while i < len(s):
+        ch = s[i]
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            i += 1
+            continue
+        for word, repl in _PY_LITERALS.items():
+            after = s[i + len(word) : i + len(word) + 1]
+            before = s[i - 1 : i]
+            if s.startswith(word, i) and not (after.isalnum() or after == "_") and not (before.isalnum() or before == "_"):
+                out.append(repl)
+                i += len(word)
+                break
+        else:
+            out.append(ch)
+            i += 1
+    return "".join(out)
+
+
+def parse_model_json(raw: str) -> dict:
+    # take the FIRST complete {...} object the model emitted, tolerating trailing
+    # prose/objects and bare Python literals
+    start = raw.find("{")
+    if start == -1:
+        raise ValueError(f"no JSON object in model output: {raw!r}")
+    body = raw[start:]
+    try:
+        obj, _ = _json.JSONDecoder().raw_decode(body)
+        return obj
+    except _json.JSONDecodeError:
+        obj, _ = _json.JSONDecoder().raw_decode(_jsonify_python_literals(body))
+        return obj
